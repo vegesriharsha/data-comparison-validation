@@ -30,7 +30,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AlertsControllerTest {
 
     private MockMvc mockMvc;
-    private ObjectMapper objectMapper;
 
     @Mock
     private ValidationDetailResultRepository validationDetailResultRepository;
@@ -44,7 +43,7 @@ class AlertsControllerTest {
     @BeforeEach
     void setup() {
         mockMvc = MockMvcBuilders.standaloneSetup(alertsController).build();
-        objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules(); // For handling Java 8 date/time
 
         // Setup test data using builders

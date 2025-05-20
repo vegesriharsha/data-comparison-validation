@@ -30,7 +30,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ReportControllerTest {
 
     private MockMvc mockMvc;
-    private ObjectMapper objectMapper;
 
     @Mock
     private ReportGenerator reportGenerator;
@@ -47,7 +46,7 @@ class ReportControllerTest {
     @BeforeEach
     void setup() {
         mockMvc = MockMvcBuilders.standaloneSetup(reportController).build();
-        objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules(); // For handling Java 8 date/time
 
         // Setup test data
@@ -183,7 +182,7 @@ class ReportControllerTest {
     @Test
     @DisplayName("Should export report as Excel")
     void testExportReport() throws Exception {
-        when(reportGenerator.exportReportAsExcel(eq("daily"), any(Map.class))).thenReturn(excelData);
+        when(reportGenerator.exportReportAsExcel(eq("daily"), any())).thenReturn(excelData);
 
         mockMvc.perform(get("/api/v1/reports/export")
                         .param("reportType", "daily")
@@ -193,13 +192,13 @@ class ReportControllerTest {
                 .andExpect(header().exists("Content-Disposition"))
                 .andExpect(content().bytes(excelData));
 
-        verify(reportGenerator).exportReportAsExcel(eq("daily"), any(Map.class));
+        verify(reportGenerator).exportReportAsExcel(eq("daily"), any());
     }
 
     @Test
     @DisplayName("Should export report for specific table")
     void testExportReportTableSpecific() throws Exception {
-        when(reportGenerator.exportReportAsExcel(eq("table"), any(Map.class))).thenReturn(excelData);
+        when(reportGenerator.exportReportAsExcel(eq("table"), any())).thenReturn(excelData);
 
         mockMvc.perform(get("/api/v1/reports/export")
                         .param("reportType", "table")
@@ -210,7 +209,7 @@ class ReportControllerTest {
                 .andExpect(header().exists("Content-Disposition"))
                 .andExpect(content().bytes(excelData));
 
-        verify(reportGenerator).exportReportAsExcel(eq("table"), any(Map.class));
+        verify(reportGenerator).exportReportAsExcel(eq("table"), any());
     }
 
     @Test

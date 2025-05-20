@@ -40,7 +40,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ExecutionControllerTest {
 
     private MockMvc mockMvc;
-    private ObjectMapper objectMapper;
 
     @Mock
     private ValidationExecutor validationExecutor;
@@ -56,16 +55,15 @@ class ExecutionControllerTest {
 
     private ValidationResult validationResult1;
     private ValidationResult validationResult2;
-    private ComparisonConfig comparisonConfig;
 
     @BeforeEach
     void setup() {
         mockMvc = MockMvcBuilders.standaloneSetup(executionController).build();
-        objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules(); // For handling Java 8 date/time
 
         // Setup test data
-        comparisonConfig = ComparisonConfig.builder()
+        ComparisonConfig comparisonConfig = ComparisonConfig.builder()
                 .id(1L)
                 .tableName("orders")
                 .enabled(true)

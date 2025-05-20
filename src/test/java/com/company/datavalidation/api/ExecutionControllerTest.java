@@ -5,7 +5,10 @@ import com.company.datavalidation.model.ValidationResult;
 import com.company.datavalidation.repository.ValidationDetailResultRepository;
 import com.company.datavalidation.repository.ValidationResultRepository;
 import com.company.datavalidation.service.validation.ValidationExecutor;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -60,13 +64,18 @@ class ExecutionControllerTest {
 
     @BeforeEach
     void setup() {
+        // Initialize ObjectMapper with proper modules for date/time serialization
         objectMapper = new ObjectMapper();
-        objectMapper.findAndRegisterModules(); // For handling Java 8 date/time
+        objectMapper.registerModule(new JavaTimeModule()); // For handling LocalDateTime
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // Use ISO-8601 format
+        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL); // Ignore null fields
 
+        // Set up MockMvc with the configured ObjectMapper
         mockMvc = MockMvcBuilders.standaloneSetup(executionController)
-                .setMessageConverters(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(objectMapper))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
 
+        // Rest of your setup code remains the same...
         // Setup test data
         ComparisonConfig comparisonConfig = ComparisonConfig.builder()
                 .id(1L)
@@ -139,23 +148,39 @@ class ExecutionControllerTest {
         verify(validationExecutor).executeValidationForConfig(1L);
     }
 
+    // Now the test method:
     @Test
     @DisplayName("Should get execution history")
     void testGetExecutionHistory() throws Exception {
+        // Create a proper Page implementation with our test data
         List<ValidationResult> results = new ArrayList<>();
         results.add(validationResult1);
         results.add(validationResult2);
+
+        // Detach the lazy-loaded entities to avoid serialization issues
+        // or use a DTO projection in your actual code
+        for (ValidationResult result : results) {
+            // Make sure ComparisonConfig reference won't cause issues during serialization
+            ComparisonConfig config = new ComparisonConfig();
+            config.setId(result.getComparisonConfig().getId());
+            config.setTableName(result.getComparisonConfig().getTableName());
+            config.setEnabled(result.getComparisonConfig().isEnabled());
+            config.setDescription(result.getComparisonConfig().getDescription());
+            result.setComparisonConfig(config);
+        }
 
         Page<ValidationResult> page = new PageImpl<>(results);
 
         PageRequest pageRequest = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "executionDate"));
         when(validationResultRepository.findAll(eq(pageRequest))).thenReturn(page);
 
-        // Use an initialized objectMapper and detach lazy-loaded entities
         mockMvc.perform(get("/api/v1/executions")
                         .param("page", "0")
                         .param("size", "20"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].id", is(1)))
+                .andExpect(jsonPath("$.content[1].id", is(2)));
 
         verify(validationResultRepository).findAll(eq(pageRequest));
     }

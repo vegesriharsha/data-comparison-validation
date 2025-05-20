@@ -34,6 +34,11 @@ dependencies {
 	implementation 'org.flywaydb:flyway-sqlserver:10.0.1'
 	implementation 'com.microsoft.sqlserver:mssql-jdbc:12.4.2.jre11'
 
+	// Jackson dependencies for JSON processing
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-hibernate5-jakarta:2.16.1'
+
 	// Utilities
 	implementation 'org.apache.commons:commons-lang3:3.14.0'
 	implementation 'org.apache.poi:poi:5.2.5'

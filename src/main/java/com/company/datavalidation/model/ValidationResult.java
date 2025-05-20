@@ -1,5 +1,7 @@
 package com.company.datavalidation.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -15,6 +17,7 @@ import java.time.LocalDateTime;
 @Builder
 @ToString
 @EqualsAndHashCode(of = "id")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ValidationResult {
 
     @Id
@@ -24,6 +27,8 @@ public class ValidationResult {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "comparison_config_id", nullable = false)
     @ToString.Exclude
+    // Tell Jackson how to handle this bidirectional relationship
+    @JsonIgnoreProperties({"validationResults"})
     private ComparisonConfig comparisonConfig;
 
     @Column(name = "execution_date", nullable = false)

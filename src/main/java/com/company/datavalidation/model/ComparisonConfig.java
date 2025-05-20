@@ -1,11 +1,15 @@
 package com.company.datavalidation.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "comparison_config")
@@ -16,6 +20,7 @@ import java.time.LocalDateTime;
 @Builder
 @ToString(exclude = {"createdDate", "lastModifiedDate"})
 @EqualsAndHashCode(of = "id")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ComparisonConfig {
 
     @Id
@@ -45,4 +50,10 @@ public class ComparisonConfig {
 
     @Column(name = "last_modified_by")
     private String lastModifiedBy;
+
+    // Optional: If you have a bidirectional relationship
+    @OneToMany(mappedBy = "comparisonConfig", cascade = CascadeType.ALL)
+    @Builder.Default
+    @JsonIgnoreProperties({"comparisonConfig"})
+    private List<ValidationResult> validationResults = new ArrayList<>();
 }

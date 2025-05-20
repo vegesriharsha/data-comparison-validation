@@ -227,6 +227,7 @@ class ValidationExecutorTest {
         verify(thresholdValidator).validateDayOverDay(dayOverDayConfig);
     }
 
+    // In ValidationExecutorTest.java
     @Test
     @DisplayName("Should handle exceptions during validation")
     void testExecuteValidationWithException() {
@@ -237,11 +238,13 @@ class ValidationExecutorTest {
         when(dayOverDayConfigRepository.findByComparisonConfigId(config1.getId()))
                 .thenReturn(Optional.of(dayOverDayConfig));
 
+        // Simulate the exception
         when(thresholdValidator.validateDayOverDay(dayOverDayConfig))
                 .thenThrow(new RuntimeException("Test exception"));
 
-        when(validationResultRepository.save(any(ValidationResult.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        // This might be the unnecessary stubbing - remove it if not needed
+        // when(validationResultRepository.save(any(ValidationResult.class)))
+        //    .thenAnswer(invocation -> invocation.getArgument(0));
 
         // Execute validations
         var results = validationExecutor.executeValidationForConfig(1L);
@@ -254,6 +257,12 @@ class ValidationExecutorTest {
         assertFalse(result.isSuccess());
         assertNotNull(result.getErrorMessage());
         assertTrue(result.getErrorMessage().contains("Test exception"));
+
+        // Verify repository calls - just the necessary ones
+        verify(comparisonConfigRepository).findById(1L);
+        verify(dayOverDayConfigRepository).findByComparisonConfigId(config1.getId());
+        verify(thresholdValidator).validateDayOverDay(dayOverDayConfig);
+        // Don't verify validationResultRepository.save if not essential for the test
     }
 
     @Test

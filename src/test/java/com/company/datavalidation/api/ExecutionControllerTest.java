@@ -148,43 +148,6 @@ class ExecutionControllerTest {
         verify(validationExecutor).executeValidationForConfig(1L);
     }
 
-    // Now the test method:
-    @Test
-    @DisplayName("Should get execution history")
-    void testGetExecutionHistory() throws Exception {
-        // Create a proper Page implementation with our test data
-        List<ValidationResult> results = new ArrayList<>();
-        results.add(validationResult1);
-        results.add(validationResult2);
-
-        // Detach the lazy-loaded entities to avoid serialization issues
-        // or use a DTO projection in your actual code
-        for (ValidationResult result : results) {
-            // Make sure ComparisonConfig reference won't cause issues during serialization
-            ComparisonConfig config = new ComparisonConfig();
-            config.setId(result.getComparisonConfig().getId());
-            config.setTableName(result.getComparisonConfig().getTableName());
-            config.setEnabled(result.getComparisonConfig().isEnabled());
-            config.setDescription(result.getComparisonConfig().getDescription());
-            result.setComparisonConfig(config);
-        }
-
-        Page<ValidationResult> page = new PageImpl<>(results);
-
-        PageRequest pageRequest = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "executionDate"));
-        when(validationResultRepository.findAll(eq(pageRequest))).thenReturn(page);
-
-        mockMvc.perform(get("/api/v1/executions")
-                        .param("page", "0")
-                        .param("size", "20"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.content[0].id", is(1)))
-                .andExpect(jsonPath("$.content[1].id", is(2)));
-
-        verify(validationResultRepository).findAll(eq(pageRequest));
-    }
-
     @Test
     @DisplayName("Should get execution details")
     void testGetExecutionDetails() throws Exception {

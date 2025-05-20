@@ -1,10 +1,11 @@
 package com.company.datavalidation.api;
 
-import com.company.datavalidation.api.ConfigurationController;
 import com.company.datavalidation.model.*;
 import com.company.datavalidation.repository.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -16,8 +17,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.*;
@@ -28,9 +28,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
-public class ConfigurationControllerTest {
+@DisplayName("Configuration Controller Tests")
+class ConfigurationControllerTest {
 
     private MockMvc mockMvc;
+    private ObjectMapper objectMapper;
 
     @Mock
     private ComparisonConfigRepository comparisonConfigRepository;
@@ -50,8 +52,7 @@ public class ConfigurationControllerTest {
     @InjectMocks
     private ConfigurationController configurationController;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
-
+    // Test data
     private ComparisonConfig comparisonConfig;
     private DayOverDayConfig dayOverDayConfig;
     private CrossTableConfig crossTableConfig;
@@ -59,51 +60,60 @@ public class ConfigurationControllerTest {
     private ThresholdConfig thresholdConfig;
 
     @BeforeEach
-    public void setup() {
+    void setup() {
         mockMvc = MockMvcBuilders.standaloneSetup(configurationController).build();
 
-        // Create test data
-        comparisonConfig = new ComparisonConfig();
-        comparisonConfig.setId(1L);
-        comparisonConfig.setTableName("orders");
-        comparisonConfig.setEnabled(true);
-        comparisonConfig.setDescription("Orders table validation");
-        comparisonConfig.setCreatedDate(LocalDateTime.now());
-        comparisonConfig.setLastModifiedDate(LocalDateTime.now());
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule()); // For LocalDateTime serialization
 
-        dayOverDayConfig = new DayOverDayConfig();
-        dayOverDayConfig.setId(1L);
-        dayOverDayConfig.setComparisonConfig(comparisonConfig);
-        dayOverDayConfig.setEnabled(true);
-        dayOverDayConfig.setExclusionCondition("status <> 'CANCELED'");
+        // Create test data using Lombok builders
+        comparisonConfig = ComparisonConfig.builder()
+                .id(1L)
+                .tableName("orders")
+                .enabled(true)
+                .description("Orders table validation")
+                .createdDate(LocalDateTime.now())
+                .lastModifiedDate(LocalDateTime.now())
+                .build();
 
-        crossTableConfig = new CrossTableConfig();
-        crossTableConfig.setId(1L);
-        crossTableConfig.setSourceComparisonConfig(comparisonConfig);
-        crossTableConfig.setTargetTableName("order_items");
-        crossTableConfig.setJoinCondition("orders.id = order_items.order_id");
-        crossTableConfig.setEnabled(true);
+        dayOverDayConfig = DayOverDayConfig.builder()
+                .id(1L)
+                .comparisonConfig(comparisonConfig)
+                .enabled(true)
+                .exclusionCondition("status <> 'CANCELED'")
+                .build();
 
-        columnComparisonConfig = new ColumnComparisonConfig();
-        columnComparisonConfig.setId(1L);
-        columnComparisonConfig.setDayOverDayConfig(dayOverDayConfig);
-        columnComparisonConfig.setColumnName("total_amount");
-        columnComparisonConfig.setComparisonType(ComparisonType.PERCENTAGE);
-        columnComparisonConfig.setNullHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO);
-        columnComparisonConfig.setBlankHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO);
-        columnComparisonConfig.setNaHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO);
+        crossTableConfig = CrossTableConfig.builder()
+                .id(1L)
+                .sourceComparisonConfig(comparisonConfig)
+                .targetTableName("order_items")
+                .joinCondition("orders.id = order_items.order_id")
+                .enabled(true)
+                .build();
 
-        thresholdConfig = new ThresholdConfig();
-        thresholdConfig.setId(1L);
-        thresholdConfig.setColumnComparisonConfig(columnComparisonConfig);
-        thresholdConfig.setThresholdValue(new BigDecimal("10.00"));
-        thresholdConfig.setSeverity(Severity.HIGH);
-        thresholdConfig.setNotificationEnabled(true);
+        columnComparisonConfig = ColumnComparisonConfig.builder()
+                .id(1L)
+                .dayOverDayConfig(dayOverDayConfig)
+                .columnName("total_amount")
+                .comparisonType(ComparisonType.PERCENTAGE)
+                .nullHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .blankHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .naHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .build();
+
+        thresholdConfig = ThresholdConfig.builder()
+                .id(1L)
+                .columnComparisonConfig(columnComparisonConfig)
+                .thresholdValue(new BigDecimal("10.00"))
+                .severity(Severity.HIGH)
+                .notificationEnabled(true)
+                .build();
     }
 
     @Test
-    public void testGetAllConfigs() throws Exception {
-        when(comparisonConfigRepository.findAll()).thenReturn(Arrays.asList(comparisonConfig));
+    @DisplayName("Should get all configs")
+    void testGetAllConfigs() throws Exception {
+        when(comparisonConfigRepository.findAll()).thenReturn(List.of(comparisonConfig));
 
         mockMvc.perform(get("/api/v1/configs"))
                 .andExpect(status().isOk())
@@ -115,7 +125,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testGetConfigById() throws Exception {
+    @DisplayName("Should get config by ID")
+    void testGetConfigById() throws Exception {
         when(comparisonConfigRepository.findById(1L)).thenReturn(Optional.of(comparisonConfig));
 
         mockMvc.perform(get("/api/v1/configs/1"))
@@ -127,7 +138,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testGetConfigById_NotFound() throws Exception {
+    @DisplayName("Should return not found when config doesn't exist")
+    void testGetConfigByIdNotFound() throws Exception {
         when(comparisonConfigRepository.findById(1L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/v1/configs/1"))
@@ -137,7 +149,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testCreateConfig() throws Exception {
+    @DisplayName("Should create config")
+    void testCreateConfig() throws Exception {
         when(comparisonConfigRepository.save(any(ComparisonConfig.class))).thenReturn(comparisonConfig);
 
         mockMvc.perform(post("/api/v1/configs")
@@ -151,7 +164,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testUpdateConfig() throws Exception {
+    @DisplayName("Should update config")
+    void testUpdateConfig() throws Exception {
         when(comparisonConfigRepository.findById(1L)).thenReturn(Optional.of(comparisonConfig));
         when(comparisonConfigRepository.save(any(ComparisonConfig.class))).thenReturn(comparisonConfig);
 
@@ -167,7 +181,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testUpdateConfig_NotFound() throws Exception {
+    @DisplayName("Should return not found when updating non-existent config")
+    void testUpdateConfigNotFound() throws Exception {
         when(comparisonConfigRepository.findById(1L)).thenReturn(Optional.empty());
 
         mockMvc.perform(put("/api/v1/configs/1")
@@ -180,7 +195,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testDeleteConfig() throws Exception {
+    @DisplayName("Should delete config")
+    void testDeleteConfig() throws Exception {
         when(comparisonConfigRepository.findById(1L)).thenReturn(Optional.of(comparisonConfig));
         doNothing().when(comparisonConfigRepository).deleteById(1L);
 
@@ -192,7 +208,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testDeleteConfig_NotFound() throws Exception {
+    @DisplayName("Should return not found when deleting non-existent config")
+    void testDeleteConfigNotFound() throws Exception {
         when(comparisonConfigRepository.findById(1L)).thenReturn(Optional.empty());
 
         mockMvc.perform(delete("/api/v1/configs/1"))
@@ -203,7 +220,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testGetDayOverDayConfig() throws Exception {
+    @DisplayName("Should get day-over-day config")
+    void testGetDayOverDayConfig() throws Exception {
         when(dayOverDayConfigRepository.findByComparisonConfigId(1L)).thenReturn(Optional.of(dayOverDayConfig));
 
         mockMvc.perform(get("/api/v1/configs/1/day-over-day"))
@@ -214,7 +232,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testCreateDayOverDayConfig() throws Exception {
+    @DisplayName("Should create day-over-day config")
+    void testCreateDayOverDayConfig() throws Exception {
         when(comparisonConfigRepository.findById(1L)).thenReturn(Optional.of(comparisonConfig));
         when(dayOverDayConfigRepository.save(any(DayOverDayConfig.class))).thenReturn(dayOverDayConfig);
 
@@ -229,10 +248,11 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testGetCrossTableConfigs() throws Exception {
+    @DisplayName("Should get cross-table configs")
+    void testGetCrossTableConfigs() throws Exception {
         when(comparisonConfigRepository.findById(1L)).thenReturn(Optional.of(comparisonConfig));
         when(crossTableConfigRepository.findBySourceComparisonConfigAndEnabled(eq(comparisonConfig), eq(true)))
-                .thenReturn(Collections.singletonList(crossTableConfig));
+                .thenReturn(List.of(crossTableConfig));
 
         mockMvc.perform(get("/api/v1/configs/1/cross-table"))
                 .andExpect(status().isOk())
@@ -245,7 +265,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testCreateCrossTableConfig() throws Exception {
+    @DisplayName("Should create cross-table config")
+    void testCreateCrossTableConfig() throws Exception {
         when(comparisonConfigRepository.findById(1L)).thenReturn(Optional.of(comparisonConfig));
         when(crossTableConfigRepository.save(any(CrossTableConfig.class))).thenReturn(crossTableConfig);
 
@@ -261,9 +282,10 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testGetColumnConfigs() throws Exception {
+    @DisplayName("Should get column configs for day-over-day")
+    void testGetColumnConfigsForDayOverDay() throws Exception {
         when(columnComparisonConfigRepository.findByDayOverDayConfigId(1L))
-                .thenReturn(Collections.singletonList(columnComparisonConfig));
+                .thenReturn(List.of(columnComparisonConfig));
 
         mockMvc.perform(get("/api/v1/configs/day-over-day/1/columns"))
                 .andExpect(status().isOk())
@@ -275,7 +297,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testCreateColumnConfig() throws Exception {
+    @DisplayName("Should create column config for day-over-day")
+    void testCreateColumnConfigForDayOverDay() throws Exception {
         when(dayOverDayConfigRepository.findById(1L)).thenReturn(Optional.of(dayOverDayConfig));
         when(columnComparisonConfigRepository.save(any(ColumnComparisonConfig.class))).thenReturn(columnComparisonConfig);
 
@@ -291,9 +314,66 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testGetThresholdConfigs() throws Exception {
+    @DisplayName("Should get column configs for cross-table")
+    void testGetColumnConfigsForCrossTable() throws Exception {
+        // Update column config to use cross-table
+        ColumnComparisonConfig crossTableColumnConfig = ColumnComparisonConfig.builder()
+                .id(2L)
+                .crossTableConfig(crossTableConfig)
+                .columnName("product_count")
+                .targetColumnName("item_count")
+                .comparisonType(ComparisonType.ABSOLUTE)
+                .nullHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .blankHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .naHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .build();
+
+        when(columnComparisonConfigRepository.findByCrossTableConfigId(1L))
+                .thenReturn(List.of(crossTableColumnConfig));
+
+        mockMvc.perform(get("/api/v1/configs/cross-table/1/columns"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id", is(2)))
+                .andExpect(jsonPath("$[0].columnName", is("product_count")));
+
+        verify(columnComparisonConfigRepository).findByCrossTableConfigId(1L);
+    }
+
+    @Test
+    @DisplayName("Should create column config for cross-table")
+    void testCreateColumnConfigForCrossTable() throws Exception {
+        // Update column config to use cross-table
+        ColumnComparisonConfig crossTableColumnConfig = ColumnComparisonConfig.builder()
+                .id(2L)
+                .crossTableConfig(crossTableConfig)
+                .columnName("product_count")
+                .targetColumnName("item_count")
+                .comparisonType(ComparisonType.ABSOLUTE)
+                .nullHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .blankHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .naHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .build();
+
+        when(crossTableConfigRepository.findById(1L)).thenReturn(Optional.of(crossTableConfig));
+        when(columnComparisonConfigRepository.save(any(ColumnComparisonConfig.class))).thenReturn(crossTableColumnConfig);
+
+        mockMvc.perform(post("/api/v1/configs/cross-table/1/columns")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(crossTableColumnConfig)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id", is(2)))
+                .andExpect(jsonPath("$.columnName", is("product_count")));
+
+        verify(crossTableConfigRepository).findById(1L);
+        verify(columnComparisonConfigRepository).save(any(ColumnComparisonConfig.class));
+    }
+
+    @Test
+    @DisplayName("Should get threshold configs")
+    void testGetThresholdConfigs() throws Exception {
         when(thresholdConfigRepository.findByColumnComparisonConfigId(1L))
-                .thenReturn(Collections.singletonList(thresholdConfig));
+                .thenReturn(List.of(thresholdConfig));
 
         mockMvc.perform(get("/api/v1/configs/columns/1/thresholds"))
                 .andExpect(status().isOk())
@@ -305,7 +385,8 @@ public class ConfigurationControllerTest {
     }
 
     @Test
-    public void testCreateThresholdConfig() throws Exception {
+    @DisplayName("Should create threshold config")
+    void testCreateThresholdConfig() throws Exception {
         when(columnComparisonConfigRepository.findById(1L)).thenReturn(Optional.of(columnComparisonConfig));
         when(thresholdConfigRepository.save(any(ThresholdConfig.class))).thenReturn(thresholdConfig);
 
@@ -318,5 +399,26 @@ public class ConfigurationControllerTest {
 
         verify(columnComparisonConfigRepository).findById(1L);
         verify(thresholdConfigRepository).save(any(ThresholdConfig.class));
+    }
+
+    @Test
+    @DisplayName("Should return not found when creating threshold for non-existent column")
+    void testCreateThresholdConfigColumnNotFound() throws Exception {
+        when(columnComparisonConfigRepository.findById(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/v1/configs/columns/999/thresholds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(thresholdConfig)))
+                .andExpect(status().isNotFound());
+
+        verify(columnComparisonConfigRepository).findById(999L);
+        verify(thresholdConfigRepository, never()).save(any(ThresholdConfig.class));
+    }
+
+    @Test
+    @DisplayName("Should return bad request for invalid config type")
+    void testGetColumnConfigsInvalidType() throws Exception {
+        mockMvc.perform(get("/api/v1/configs/invalid-type/1/columns"))
+                .andExpect(status().isBadRequest());
     }
 }

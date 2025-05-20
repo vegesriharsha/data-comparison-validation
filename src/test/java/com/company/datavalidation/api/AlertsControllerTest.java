@@ -2,20 +2,21 @@ package com.company.datavalidation.api;
 
 import com.company.datavalidation.model.*;
 import com.company.datavalidation.repository.ValidationDetailResultRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.verify;
@@ -24,9 +25,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
-public class AlertsControllerTest {
+@DisplayName("Alerts Controller Tests")
+class AlertsControllerTest {
 
     private MockMvc mockMvc;
+    private ObjectMapper objectMapper;
 
     @Mock
     private ValidationDetailResultRepository validationDetailResultRepository;
@@ -34,67 +37,75 @@ public class AlertsControllerTest {
     @InjectMocks
     private AlertsController alertsController;
 
+    // Test data
     private List<ValidationDetailResult> validationDetailResults;
-    private ComparisonConfig comparisonConfig;
-    private ValidationResult validationResult;
-    private ColumnComparisonConfig columnComparisonConfig;
 
     @BeforeEach
-    public void setup() {
+    void setup() {
         mockMvc = MockMvcBuilders.standaloneSetup(alertsController).build();
+        objectMapper = new ObjectMapper();
+        objectMapper.findAndRegisterModules(); // For handling Java 8 date/time
 
-        // Setup test data
-        comparisonConfig = new ComparisonConfig();
-        comparisonConfig.setId(1L);
-        comparisonConfig.setTableName("orders");
-        comparisonConfig.setEnabled(true);
+        // Setup test data using builders
+        ComparisonConfig comparisonConfig = ComparisonConfig.builder()
+                .id(1L)
+                .tableName("orders")
+                .enabled(true)
+                .build();
 
-        validationResult = new ValidationResult();
-        validationResult.setId(1L);
-        validationResult.setComparisonConfig(comparisonConfig);
-        validationResult.setExecutionDate(LocalDateTime.now().minusHours(1));
-        validationResult.setSuccess(false);
-        validationResult.setErrorMessage("Validation failed: threshold exceeded");
+        ValidationResult validationResult = ValidationResult.builder()
+                .id(1L)
+                .comparisonConfig(comparisonConfig)
+                .executionDate(LocalDateTime.now().minusHours(1))
+                .success(false)
+                .errorMessage("Validation failed: threshold exceeded")
+                .build();
 
-        DayOverDayConfig dayOverDayConfig = new DayOverDayConfig();
-        dayOverDayConfig.setId(1L);
-        dayOverDayConfig.setComparisonConfig(comparisonConfig);
-        dayOverDayConfig.setEnabled(true);
+        DayOverDayConfig dayOverDayConfig = DayOverDayConfig.builder()
+                .id(1L)
+                .comparisonConfig(comparisonConfig)
+                .enabled(true)
+                .build();
 
-        columnComparisonConfig = new ColumnComparisonConfig();
-        columnComparisonConfig.setId(1L);
-        columnComparisonConfig.setDayOverDayConfig(dayOverDayConfig);
-        columnComparisonConfig.setColumnName("total_amount");
-        columnComparisonConfig.setComparisonType(ComparisonType.PERCENTAGE);
+        ColumnComparisonConfig columnComparisonConfig = ColumnComparisonConfig.builder()
+                .id(1L)
+                .dayOverDayConfig(dayOverDayConfig)
+                .columnName("total_amount")
+                .comparisonType(ComparisonType.PERCENTAGE)
+                .nullHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .blankHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .naHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO)
+                .build();
 
         // Create validation detail results
-        validationDetailResults = new ArrayList<>();
+        validationDetailResults = List.of(
+                ValidationDetailResult.builder()
+                        .id(1L)
+                        .validationResult(validationResult)
+                        .columnComparisonConfig(columnComparisonConfig)
+                        .thresholdExceeded(true)
+                        .actualValue(new BigDecimal("120.00"))
+                        .expectedValue(new BigDecimal("100.00"))
+                        .differenceValue(new BigDecimal("20.00"))
+                        .differencePercentage(new BigDecimal("20.00"))
+                        .build(),
 
-        ValidationDetailResult detail1 = new ValidationDetailResult();
-        detail1.setId(1L);
-        detail1.setValidationResult(validationResult);
-        detail1.setColumnComparisonConfig(columnComparisonConfig);
-        detail1.setThresholdExceeded(true);
-        detail1.setActualValue(new BigDecimal("120.00"));
-        detail1.setExpectedValue(new BigDecimal("100.00"));
-        detail1.setDifferenceValue(new BigDecimal("20.00"));
-        detail1.setDifferencePercentage(new BigDecimal("20.00"));
-        validationDetailResults.add(detail1);
-
-        ValidationDetailResult detail2 = new ValidationDetailResult();
-        detail2.setId(2L);
-        detail2.setValidationResult(validationResult);
-        detail2.setColumnComparisonConfig(columnComparisonConfig);
-        detail2.setThresholdExceeded(true);
-        detail2.setActualValue(new BigDecimal("90.00"));
-        detail2.setExpectedValue(new BigDecimal("100.00"));
-        detail2.setDifferenceValue(new BigDecimal("-10.00"));
-        detail2.setDifferencePercentage(new BigDecimal("-10.00"));
-        validationDetailResults.add(detail2);
+                ValidationDetailResult.builder()
+                        .id(2L)
+                        .validationResult(validationResult)
+                        .columnComparisonConfig(columnComparisonConfig)
+                        .thresholdExceeded(true)
+                        .actualValue(new BigDecimal("90.00"))
+                        .expectedValue(new BigDecimal("100.00"))
+                        .differenceValue(new BigDecimal("-10.00"))
+                        .differencePercentage(new BigDecimal("-10.00"))
+                        .build()
+        );
     }
 
     @Test
-    public void testGetAllAlerts() throws Exception {
+    @DisplayName("Should get all alerts")
+    void testGetAllAlerts() throws Exception {
         when(validationDetailResultRepository.findAll()).thenReturn(validationDetailResults);
 
         mockMvc.perform(get("/api/v1/alerts"))
@@ -103,17 +114,16 @@ public class AlertsControllerTest {
                 .andExpect(jsonPath("$[0].id", is(1)))
                 .andExpect(jsonPath("$[0].tableName", is("orders")))
                 .andExpect(jsonPath("$[0].columnName", is("total_amount")))
-                .andExpect(jsonPath("$[0].differencePercentage", is(20.0)))
+                .andExpect(jsonPath("$[0].differencePercentage", is("20.00%")))
                 .andExpect(jsonPath("$[1].id", is(2)))
-                .andExpect(jsonPath("$[1].differencePercentage", is(-10.0)));
+                .andExpect(jsonPath("$[1].differencePercentage", is("-10.00%")));
 
         verify(validationDetailResultRepository).findAll();
     }
 
     @Test
-    public void testGetAlertsBySeverity() throws Exception {
-        // Filter to only include HIGH severity alerts in a real implementation
-        // For this test, we're simplifying and returning all alerts
+    @DisplayName("Should get alerts by severity")
+    void testGetAlertsBySeverity() throws Exception {
         when(validationDetailResultRepository.findAll()).thenReturn(validationDetailResults);
 
         mockMvc.perform(get("/api/v1/alerts/severity/HIGH"))
@@ -127,28 +137,46 @@ public class AlertsControllerTest {
     }
 
     @Test
-    public void testGetAlertsBySeverity_InvalidSeverity() throws Exception {
+    @DisplayName("Should return bad request for invalid severity")
+    void testGetAlertsBySeverityInvalid() throws Exception {
         mockMvc.perform(get("/api/v1/alerts/severity/INVALID"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    public void testAcknowledgeAlert() throws Exception {
-        mockMvc.perform(put("/api/v1/alerts/1/acknowledge"))
+    @DisplayName("Should acknowledge alert")
+    void testAcknowledgeAlert() throws Exception {
+        mockMvc.perform(put("/api/v1/alerts/1/acknowledge")
+                        .param("acknowledgedBy", "test-user"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.acknowledged", is(true)))
-                .andExpect(jsonPath("$.message", is("Alert acknowledged successfully")));
+                .andExpect(jsonPath("$.message", is("Alert acknowledged successfully")))
+                .andExpect(jsonPath("$.acknowledgedBy", is("test-user")));
     }
 
     @Test
-    public void testGetAlertCount() throws Exception {
+    @DisplayName("Should get alert count")
+    void testGetAlertCount() throws Exception {
         when(validationDetailResultRepository.findAll()).thenReturn(validationDetailResults);
 
         mockMvc.perform(get("/api/v1/alerts/count"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.alertCount", is(2)))
-                .andExpect(jsonPath("$.timestamp", notNullValue()));
+                .andExpect(jsonPath("$.countBySeverity.HIGH", greaterThanOrEqualTo(0)))
+                .andExpect(jsonPath("$.timestamp").exists());
+
+        verify(validationDetailResultRepository).findAll();
+    }
+
+    @Test
+    @DisplayName("Should handle empty alert list")
+    void testGetAlertsEmpty() throws Exception {
+        when(validationDetailResultRepository.findAll()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/alerts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
 
         verify(validationDetailResultRepository).findAll();
     }

@@ -4,21 +4,22 @@ import com.company.datavalidation.model.*;
 import com.company.datavalidation.repository.*;
 import com.company.datavalidation.service.comparison.CrossTableComparator;
 import com.company.datavalidation.service.comparison.DayOverDayComparator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class ThresholdValidator {
-
-    private static final Logger logger = LoggerFactory.getLogger(ThresholdValidator.class);
 
     private final DayOverDayComparator dayOverDayComparator;
     private final CrossTableComparator crossTableComparator;
@@ -27,22 +28,6 @@ public class ThresholdValidator {
     private final ValidationResultRepository validationResultRepository;
     private final ValidationDetailResultRepository validationDetailResultRepository;
 
-    @Autowired
-    public ThresholdValidator(
-            DayOverDayComparator dayOverDayComparator,
-            CrossTableComparator crossTableComparator,
-            ColumnComparisonConfigRepository columnComparisonConfigRepository,
-            ThresholdConfigRepository thresholdConfigRepository,
-            ValidationResultRepository validationResultRepository,
-            ValidationDetailResultRepository validationDetailResultRepository) {
-        this.dayOverDayComparator = dayOverDayComparator;
-        this.crossTableComparator = crossTableComparator;
-        this.columnComparisonConfigRepository = columnComparisonConfigRepository;
-        this.thresholdConfigRepository = thresholdConfigRepository;
-        this.validationResultRepository = validationResultRepository;
-        this.validationDetailResultRepository = validationDetailResultRepository;
-    }
-
     /**
      * Validate a day-over-day configuration
      * @param config Day-over-day configuration
@@ -50,20 +35,28 @@ public class ThresholdValidator {
      */
     @Transactional
     public ValidationResult validateDayOverDay(DayOverDayConfig config) {
-        ValidationResult result = new ValidationResult();
-        result.setComparisonConfig(config.getComparisonConfig());
+        log.info("Validating day-over-day config: {}", config.getId());
+
+        // Create the validation result first
+        final ValidationResult result = ValidationResult.builder()
+                .comparisonConfig(config.getComparisonConfig())
+                .executionDate(LocalDateTime.now())
+                .build();
 
         long startTime = System.currentTimeMillis();
 
         try {
             // Get column configurations
             List<ColumnComparisonConfig> columnConfigs = columnComparisonConfigRepository.findByDayOverDayConfig(config);
+            log.debug("Found {} column configurations", columnConfigs.size());
 
             // Get threshold configurations
             Map<Long, ThresholdConfig> thresholdConfigs = getThresholdConfigs(columnConfigs);
+            log.debug("Found {} threshold configurations", thresholdConfigs.size());
 
             // Perform comparison
             List<ValidationDetailResult> detailResults = dayOverDayComparator.compare(config, columnConfigs, thresholdConfigs);
+            log.debug("Comparison generated {} detail results", detailResults.size());
 
             // Check if any thresholds were exceeded
             boolean anyThresholdExceeded = detailResults.stream()
@@ -71,24 +64,30 @@ public class ThresholdValidator {
 
             // Save validation result
             result.setSuccess(!anyThresholdExceeded);
-            result = validationResultRepository.save(result);
+            ValidationResult savedResult = validationResultRepository.save(result);
+            log.debug("Saved validation result: {}, success: {}", savedResult.getId(), savedResult.isSuccess());
 
             // Link detail results to validation result
-            for (ValidationDetailResult detailResult : detailResults) {
-                detailResult.setValidationResult(result);
+            final ValidationResult finalResult = savedResult; // Create final reference for lambda
+            detailResults.forEach(detailResult -> {
+                detailResult.setValidationResult(finalResult);
                 validationDetailResultRepository.save(detailResult);
-            }
+            });
+
+            // Return the saved result
+            result.setId(savedResult.getId());
 
         } catch (Exception e) {
-            logger.error("Error validating day-over-day config: " + config.getId(), e);
+            log.error("Error validating day-over-day config: {}", config.getId(), e);
             result.setSuccess(false);
             result.setErrorMessage(e.getMessage());
-            result = validationResultRepository.save(result);
+            validationResultRepository.save(result);
         }
 
         // Record execution time
         long endTime = System.currentTimeMillis();
         result.setExecutionTimeMs((int) (endTime - startTime));
+        log.info("Day-over-day validation completed in {}ms", result.getExecutionTimeMs());
 
         return validationResultRepository.save(result);
     }
@@ -100,20 +99,28 @@ public class ThresholdValidator {
      */
     @Transactional
     public ValidationResult validateCrossTable(CrossTableConfig config) {
-        ValidationResult result = new ValidationResult();
-        result.setComparisonConfig(config.getSourceComparisonConfig());
+        log.info("Validating cross-table config: {}", config.getId());
+
+        // Create the validation result first
+        final ValidationResult result = ValidationResult.builder()
+                .comparisonConfig(config.getSourceComparisonConfig())
+                .executionDate(LocalDateTime.now())
+                .build();
 
         long startTime = System.currentTimeMillis();
 
         try {
             // Get column configurations
             List<ColumnComparisonConfig> columnConfigs = columnComparisonConfigRepository.findByCrossTableConfig(config);
+            log.debug("Found {} column configurations", columnConfigs.size());
 
             // Get threshold configurations
             Map<Long, ThresholdConfig> thresholdConfigs = getThresholdConfigs(columnConfigs);
+            log.debug("Found {} threshold configurations", thresholdConfigs.size());
 
             // Perform comparison
             List<ValidationDetailResult> detailResults = crossTableComparator.compare(config, columnConfigs, thresholdConfigs);
+            log.debug("Comparison generated {} detail results", detailResults.size());
 
             // Check if any thresholds were exceeded
             boolean anyThresholdExceeded = detailResults.stream()
@@ -121,24 +128,30 @@ public class ThresholdValidator {
 
             // Save validation result
             result.setSuccess(!anyThresholdExceeded);
-            result = validationResultRepository.save(result);
+            ValidationResult savedResult = validationResultRepository.save(result);
+            log.debug("Saved validation result: {}, success: {}", savedResult.getId(), savedResult.isSuccess());
 
             // Link detail results to validation result
-            for (ValidationDetailResult detailResult : detailResults) {
-                detailResult.setValidationResult(result);
+            final ValidationResult finalResult = savedResult; // Create final reference for lambda
+            detailResults.forEach(detailResult -> {
+                detailResult.setValidationResult(finalResult);
                 validationDetailResultRepository.save(detailResult);
-            }
+            });
+
+            // Return the saved result
+            result.setId(savedResult.getId());
 
         } catch (Exception e) {
-            logger.error("Error validating cross-table config: " + config.getId(), e);
+            log.error("Error validating cross-table config: {}", config.getId(), e);
             result.setSuccess(false);
             result.setErrorMessage(e.getMessage());
-            result = validationResultRepository.save(result);
+            validationResultRepository.save(result);
         }
 
         // Record execution time
         long endTime = System.currentTimeMillis();
         result.setExecutionTimeMs((int) (endTime - startTime));
+        log.info("Cross-table validation completed in {}ms", result.getExecutionTimeMs());
 
         return validationResultRepository.save(result);
     }
@@ -149,26 +162,25 @@ public class ThresholdValidator {
      * @return Map of column configuration ID to threshold configuration
      */
     private Map<Long, ThresholdConfig> getThresholdConfigs(List<ColumnComparisonConfig> columnConfigs) {
+        // Extract column config IDs
         List<Long> columnConfigIds = columnConfigs.stream()
                 .map(ColumnComparisonConfig::getId)
                 .toList();
 
-        List<ThresholdConfig> thresholdConfigs = new ArrayList<>();
+        // Create result map
+        Map<Long, ThresholdConfig> result = new HashMap<>();
 
+        // Process each column config ID
         for (Long columnConfigId : columnConfigIds) {
             // For each column, get all thresholds
             List<ThresholdConfig> configs = thresholdConfigRepository.findByColumnComparisonConfigId(columnConfigId);
             if (!configs.isEmpty()) {
                 // Just use the first threshold for now
                 // In a real implementation, we might want to handle multiple thresholds per column
-                thresholdConfigs.add(configs.get(0));
+                result.put(columnConfigId, configs.getFirst());
             }
         }
 
-        return thresholdConfigs.stream()
-                .collect(Collectors.toMap(
-                        config -> config.getColumnComparisonConfig().getId(),
-                        config -> config
-                ));
+        return result;
     }
 }

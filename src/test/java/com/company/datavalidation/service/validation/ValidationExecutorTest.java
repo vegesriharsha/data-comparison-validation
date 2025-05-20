@@ -3,14 +3,13 @@ package com.company.datavalidation.service.validation;
 import com.company.datavalidation.model.*;
 import com.company.datavalidation.repository.*;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,7 +18,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class ValidationExecutorTest {
+@DisplayName("Validation Executor Tests")
+class ValidationExecutorTest {
 
     @Mock
     private ComparisonConfigRepository comparisonConfigRepository;
@@ -39,6 +39,7 @@ public class ValidationExecutorTest {
     @InjectMocks
     private ValidationExecutor validationExecutor;
 
+    // Test objects
     private ComparisonConfig config1;
     private ComparisonConfig config2;
     private DayOverDayConfig dayOverDayConfig;
@@ -47,54 +48,61 @@ public class ValidationExecutorTest {
     private ValidationResult failedResult;
 
     @BeforeEach
-    public void setup() {
+    void setup() {
         // Setup comparison configs
-        config1 = new ComparisonConfig();
-        config1.setId(1L);
-        config1.setTableName("table1");
-        config1.setEnabled(true);
+        config1 = ComparisonConfig.builder()
+                .id(1L)
+                .tableName("table1")
+                .enabled(true)
+                .build();
 
-        config2 = new ComparisonConfig();
-        config2.setId(2L);
-        config2.setTableName("table2");
-        config2.setEnabled(true);
+        config2 = ComparisonConfig.builder()
+                .id(2L)
+                .tableName("table2")
+                .enabled(true)
+                .build();
 
         // Setup day-over-day config
-        dayOverDayConfig = new DayOverDayConfig();
-        dayOverDayConfig.setId(1L);
-        dayOverDayConfig.setComparisonConfig(config1);
-        dayOverDayConfig.setEnabled(true);
+        dayOverDayConfig = DayOverDayConfig.builder()
+                .id(1L)
+                .comparisonConfig(config1)
+                .enabled(true)
+                .build();
 
         // Setup cross-table config
-        crossTableConfig = new CrossTableConfig();
-        crossTableConfig.setId(1L);
-        crossTableConfig.setSourceComparisonConfig(config2);
-        crossTableConfig.setTargetTableName("target_table");
-        crossTableConfig.setEnabled(true);
+        crossTableConfig = CrossTableConfig.builder()
+                .id(1L)
+                .sourceComparisonConfig(config2)
+                .targetTableName("target_table")
+                .enabled(true)
+                .build();
 
         // Setup validation results
-        successResult = new ValidationResult();
-        successResult.setId(1L);
-        successResult.setComparisonConfig(config1);
-        successResult.setSuccess(true);
+        successResult = ValidationResult.builder()
+                .id(1L)
+                .comparisonConfig(config1)
+                .success(true)
+                .build();
 
-        failedResult = new ValidationResult();
-        failedResult.setId(2L);
-        failedResult.setComparisonConfig(config2);
-        failedResult.setSuccess(false);
+        failedResult = ValidationResult.builder()
+                .id(2L)
+                .comparisonConfig(config2)
+                .success(false)
+                .build();
     }
 
     @Test
-    public void testExecuteAllValidations() {
+    @DisplayName("Should execute all enabled validations")
+    void testExecuteAllValidations() {
         // Mock repository behavior
         when(comparisonConfigRepository.findByEnabled(true))
-                .thenReturn(Arrays.asList(config1, config2));
+                .thenReturn(List.of(config1, config2));
 
         when(dayOverDayConfigRepository.findByComparisonConfigId(config1.getId()))
                 .thenReturn(Optional.of(dayOverDayConfig));
 
         when(crossTableConfigRepository.findBySourceComparisonConfigAndEnabled(config2, true))
-                .thenReturn(Collections.singletonList(crossTableConfig));
+                .thenReturn(List.of(crossTableConfig));
 
         when(thresholdValidator.validateDayOverDay(dayOverDayConfig))
                 .thenReturn(successResult);
@@ -103,7 +111,7 @@ public class ValidationExecutorTest {
                 .thenReturn(failedResult);
 
         // Execute validations
-        List<ValidationResult> results = validationExecutor.executeAllValidations();
+        var results = validationExecutor.executeAllValidations();
 
         // Verify results
         assertNotNull(results);
@@ -120,7 +128,8 @@ public class ValidationExecutorTest {
     }
 
     @Test
-    public void testExecuteValidationForTable() {
+    @DisplayName("Should execute validation for a specific table")
+    void testExecuteValidationForTable() {
         // Mock repository behavior
         when(comparisonConfigRepository.findByTableNameIgnoreCase("table1"))
                 .thenReturn(Optional.of(config1));
@@ -129,18 +138,18 @@ public class ValidationExecutorTest {
                 .thenReturn(Optional.of(dayOverDayConfig));
 
         when(crossTableConfigRepository.findBySourceComparisonConfigAndEnabled(config1, true))
-                .thenReturn(Collections.emptyList());
+                .thenReturn(List.of());
 
         when(thresholdValidator.validateDayOverDay(dayOverDayConfig))
                 .thenReturn(successResult);
 
         // Execute validations
-        List<ValidationResult> results = validationExecutor.executeValidationForTable("table1");
+        var results = validationExecutor.executeValidationForTable("table1");
 
         // Verify results
         assertNotNull(results);
         assertEquals(1, results.size());
-        assertEquals(successResult, results.get(0));
+        assertEquals(successResult, results.getFirst());
 
         // Verify repository calls
         verify(comparisonConfigRepository).findByTableNameIgnoreCase("table1");
@@ -150,7 +159,29 @@ public class ValidationExecutorTest {
     }
 
     @Test
-    public void testExecuteValidationForConfig() {
+    @DisplayName("Should return empty list when table is not found")
+    void testExecuteValidationForTableNotFound() {
+        // Mock repository behavior
+        when(comparisonConfigRepository.findByTableNameIgnoreCase("nonexistent"))
+                .thenReturn(Optional.empty());
+
+        // Execute validations
+        var results = validationExecutor.executeValidationForTable("nonexistent");
+
+        // Verify results
+        assertNotNull(results);
+        assertTrue(results.isEmpty());
+
+        // Verify repository calls
+        verify(comparisonConfigRepository).findByTableNameIgnoreCase("nonexistent");
+        verifyNoInteractions(dayOverDayConfigRepository);
+        verifyNoInteractions(crossTableConfigRepository);
+        verifyNoInteractions(thresholdValidator);
+    }
+
+    @Test
+    @DisplayName("Should execute validation for a specific config")
+    void testExecuteValidationForConfig() {
         // Mock repository behavior
         when(comparisonConfigRepository.findById(1L))
                 .thenReturn(Optional.of(config1));
@@ -159,18 +190,18 @@ public class ValidationExecutorTest {
                 .thenReturn(Optional.of(dayOverDayConfig));
 
         when(crossTableConfigRepository.findBySourceComparisonConfigAndEnabled(config1, true))
-                .thenReturn(Collections.emptyList());
+                .thenReturn(List.of());
 
         when(thresholdValidator.validateDayOverDay(dayOverDayConfig))
                 .thenReturn(successResult);
 
         // Execute validations
-        List<ValidationResult> results = validationExecutor.executeValidationForConfig(1L);
+        var results = validationExecutor.executeValidationForConfig(1L);
 
         // Verify results
         assertNotNull(results);
         assertEquals(1, results.size());
-        assertEquals(successResult, results.get(0));
+        assertEquals(successResult, results.getFirst());
 
         // Verify repository calls
         verify(comparisonConfigRepository).findById(1L);
@@ -180,22 +211,50 @@ public class ValidationExecutorTest {
     }
 
     @Test
-    public void testRetryValidation() {
+    @DisplayName("Should handle exceptions during validation")
+    void testExecuteValidationWithException() {
         // Mock repository behavior
-        when(validationResultRepository.findById(1L)).thenReturn(Optional.of(failedResult));
+        when(comparisonConfigRepository.findById(1L))
+                .thenReturn(Optional.of(config1));
+
+        when(dayOverDayConfigRepository.findByComparisonConfigId(config1.getId()))
+                .thenReturn(Optional.of(dayOverDayConfig));
+
+        when(thresholdValidator.validateDayOverDay(dayOverDayConfig))
+                .thenThrow(new RuntimeException("Test exception"));
+
+        // Execute validations
+        var results = validationExecutor.executeValidationForConfig(1L);
+
+        // Verify results
+        assertNotNull(results);
+        assertEquals(1, results.size());
+
+        var result = results.getFirst();
+        assertFalse(result.isSuccess());
+        assertNotNull(result.getErrorMessage());
+        assertTrue(result.getErrorMessage().contains("Test exception"));
+    }
+
+    @Test
+    @DisplayName("Should retry a failed validation")
+    void testRetryValidation() {
+        // Mock repository behavior
+        when(validationResultRepository.findById(1L))
+                .thenReturn(Optional.of(failedResult));
 
         when(dayOverDayConfigRepository.findByComparisonConfigId(failedResult.getComparisonConfig().getId()))
                 .thenReturn(Optional.empty());
 
         when(crossTableConfigRepository.findBySourceComparisonConfigAndEnabled(
                 failedResult.getComparisonConfig(), true))
-                .thenReturn(Collections.singletonList(crossTableConfig));
+                .thenReturn(List.of(crossTableConfig));
 
         when(thresholdValidator.validateCrossTable(crossTableConfig))
                 .thenReturn(successResult);
 
         // Execute retry
-        ValidationResult result = validationExecutor.retryValidation(1L);
+        var result = validationExecutor.retryValidation(1L);
 
         // Verify results
         assertNotNull(result);
@@ -203,20 +262,28 @@ public class ValidationExecutorTest {
 
         // Verify repository calls
         verify(validationResultRepository).findById(1L);
+        verify(crossTableConfigRepository).findBySourceComparisonConfigAndEnabled(
+                failedResult.getComparisonConfig(), true);
+        verify(thresholdValidator).validateCrossTable(crossTableConfig);
     }
 
     @Test
-    public void testRetryValidation_NotFound() {
+    @DisplayName("Should return null when retry validation not found")
+    void testRetryValidationNotFound() {
         // Mock repository behavior
-        when(validationResultRepository.findById(1L)).thenReturn(Optional.empty());
+        when(validationResultRepository.findById(999L))
+                .thenReturn(Optional.empty());
 
         // Execute retry
-        ValidationResult result = validationExecutor.retryValidation(1L);
+        var result = validationExecutor.retryValidation(999L);
 
         // Verify results
         assertNull(result);
 
         // Verify repository calls
-        verify(validationResultRepository).findById(1L);
+        verify(validationResultRepository).findById(999L);
+        verifyNoInteractions(dayOverDayConfigRepository);
+        verifyNoInteractions(crossTableConfigRepository);
+        verifyNoInteractions(thresholdValidator);
     }
 }

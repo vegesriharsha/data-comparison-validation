@@ -1,11 +1,19 @@
 package com.company.datavalidation.model;
 
 import jakarta.persistence.*;
+import lombok.*;
 
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "threshold_config")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString
+@EqualsAndHashCode(of = "id")
 public class ThresholdConfig {
 
     @Id
@@ -14,6 +22,7 @@ public class ThresholdConfig {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "column_comparison_config_id", nullable = false)
+    @ToString.Exclude
     private ColumnComparisonConfig columnComparisonConfig;
 
     @Column(name = "threshold_value", nullable = false, precision = 18, scale = 4)
@@ -24,46 +33,6 @@ public class ThresholdConfig {
     private Severity severity;
 
     @Column(name = "notification_enabled", nullable = false)
+    @Builder.Default
     private boolean notificationEnabled = true;
-
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public ColumnComparisonConfig getColumnComparisonConfig() {
-        return columnComparisonConfig;
-    }
-
-    public void setColumnComparisonConfig(ColumnComparisonConfig columnComparisonConfig) {
-        this.columnComparisonConfig = columnComparisonConfig;
-    }
-
-    public BigDecimal getThresholdValue() {
-        return thresholdValue;
-    }
-
-    public void setThresholdValue(BigDecimal thresholdValue) {
-        this.thresholdValue = thresholdValue;
-    }
-
-    public Severity getSeverity() {
-        return severity;
-    }
-
-    public void setSeverity(Severity severity) {
-        this.severity = severity;
-    }
-
-    public boolean isNotificationEnabled() {
-        return notificationEnabled;
-    }
-
-    public void setNotificationEnabled(boolean notificationEnabled) {
-        this.notificationEnabled = notificationEnabled;
-    }
 }

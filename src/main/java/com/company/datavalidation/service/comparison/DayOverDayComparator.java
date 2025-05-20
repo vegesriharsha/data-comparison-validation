@@ -2,7 +2,7 @@ package com.company.datavalidation.service.comparison;
 
 import com.company.datavalidation.model.*;
 import com.company.datavalidation.repository.DynamicTableRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -11,9 +11,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class DayOverDayComparator extends AbstractComparator {
 
-    @Autowired
     public DayOverDayComparator(DynamicTableRepository dynamicTableRepository) {
         super(dynamicTableRepository);
     }
@@ -22,12 +22,14 @@ public class DayOverDayComparator extends AbstractComparator {
      * Perform day-over-day comparison
      * @param config Day-over-day configuration
      * @param columnConfigs List of column configuration
-     * @param thresholdConfigs List of threshold configurations
+     * @param thresholdConfigs Map of column config ID to threshold configuration
      * @return List of validation detail results
      */
     public List<ValidationDetailResult> compare(DayOverDayConfig config,
                                                 List<ColumnComparisonConfig> columnConfigs,
                                                 Map<Long, ThresholdConfig> thresholdConfigs) {
+
+        log.debug("Starting day-over-day comparison for config: {}", config.getId());
 
         ComparisonConfig comparisonConfig = config.getComparisonConfig();
         String tableName = comparisonConfig.getTableName();
@@ -36,50 +38,42 @@ public class DayOverDayComparator extends AbstractComparator {
         // Extract column names for query
         List<String> columnNames = columnConfigs.stream()
                 .map(ColumnComparisonConfig::getColumnName)
-                .collect(Collectors.toList());
+                .toList();
 
         // Add a date column - assuming a standard column name for date
         String dateColumn = "created_date"; // This should be configurable
 
         // Get today's data
         LocalDate today = LocalDate.now();
-        List<Map<String, Object>> todayData = dynamicTableRepository.getDataForDate(
+        var todayData = dynamicTableRepository.getDataForDate(
                 tableName, columnNames, dateColumn, today, exclusionCondition);
 
         // Get yesterday's data
         LocalDate yesterday = today.minusDays(1);
-        List<Map<String, Object>> yesterdayData = dynamicTableRepository.getDataForDate(
+        var yesterdayData = dynamicTableRepository.getDataForDate(
                 tableName, columnNames, dateColumn, yesterday, exclusionCondition);
 
         // Perform comparison for each column configuration
-        List<ValidationDetailResult> results = new ArrayList<>();
+        return columnConfigs.stream()
+                .flatMap(columnConfig -> {
+                    String columnName = columnConfig.getColumnName();
 
-        for (ColumnComparisonConfig columnConfig : columnConfigs) {
-            String columnName = columnConfig.getColumnName();
+                    // Get threshold config
+                    ThresholdConfig thresholdConfig = thresholdConfigs.get(columnConfig.getId());
+                    if (thresholdConfig == null) {
+                        log.warn("No threshold configuration found for column config: {}", columnConfig.getId());
+                        return java.util.stream.Stream.empty();
+                    }
 
-            // Get threshold config
-            ThresholdConfig thresholdConfig = thresholdConfigs.get(columnConfig.getId());
-            if (thresholdConfig == null) {
-                // Skip comparison if no threshold is defined
-                continue;
-            }
-
-            // Perform aggregate comparison if needed
-            if (columnName.contains("(") && columnName.contains(")")) {
-                // This is an aggregate function
-                ValidationDetailResult result = compareAggregate(
-                        tableName, columnName, dateColumn, today, yesterday,
-                        exclusionCondition, columnConfig, thresholdConfig);
-                results.add(result);
-            } else {
-                // This is a regular column comparison
-                List<ValidationDetailResult> columnResults = compareRegularColumn(
-                        todayData, yesterdayData, columnName, columnConfig, thresholdConfig);
-                results.addAll(columnResults);
-            }
-        }
-
-        return results;
+                    // Determine comparison type
+                    return columnName.contains("(") && columnName.contains(")")
+                            ? java.util.stream.Stream.of(
+                            compareAggregate(tableName, columnName, dateColumn, today, yesterday,
+                                    exclusionCondition, columnConfig, thresholdConfig))
+                            : compareRegularColumn(todayData, yesterdayData, columnName,
+                            columnConfig, thresholdConfig).stream();
+                })
+                .collect(Collectors.toList());
     }
 
     /**
@@ -125,16 +119,15 @@ public class DayOverDayComparator extends AbstractComparator {
         boolean thresholdExceeded = isThresholdExceeded(
                 comparisonResult, columnConfig, thresholdConfig.getThresholdValue());
 
-        // Create result
-        ValidationDetailResult result = new ValidationDetailResult();
-        result.setColumnComparisonConfig(columnConfig);
-        result.setActualValue(comparisonResult.getActualValue());
-        result.setExpectedValue(comparisonResult.getExpectedValue());
-        result.setDifferenceValue(comparisonResult.getDifferenceValue());
-        result.setDifferencePercentage(comparisonResult.getDifferencePercentage());
-        result.setThresholdExceeded(thresholdExceeded);
-
-        return result;
+        // Create and return result
+        return ValidationDetailResult.builder()
+                .columnComparisonConfig(columnConfig)
+                .actualValue(comparisonResult.actualValue())
+                .expectedValue(comparisonResult.expectedValue())
+                .differenceValue(comparisonResult.differenceValue())
+                .differencePercentage(comparisonResult.differencePercentage())
+                .thresholdExceeded(thresholdExceeded)
+                .build();
     }
 
     /**
@@ -152,25 +145,17 @@ public class DayOverDayComparator extends AbstractComparator {
                                                               ColumnComparisonConfig columnConfig,
                                                               ThresholdConfig thresholdConfig) {
 
-        List<ValidationDetailResult> results = new ArrayList<>();
+        // Sum values for today
+        BigDecimal todaySum = todayData.stream()
+                .map(row -> extractValue(row, columnName, columnConfig.getNullHandlingStrategy()))
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // For now, just compare the sum of values
-        // In a real implementation, we would need a way to match rows between today and yesterday
-        BigDecimal todaySum = BigDecimal.ZERO;
-        for (Map<String, Object> row : todayData) {
-            BigDecimal value = extractValue(row, columnName, columnConfig.getNullHandlingStrategy());
-            if (value != null) {
-                todaySum = todaySum.add(value);
-            }
-        }
-
-        BigDecimal yesterdaySum = BigDecimal.ZERO;
-        for (Map<String, Object> row : yesterdayData) {
-            BigDecimal value = extractValue(row, columnName, columnConfig.getNullHandlingStrategy());
-            if (value != null) {
-                yesterdaySum = yesterdaySum.add(value);
-            }
-        }
+        // Sum values for yesterday
+        BigDecimal yesterdaySum = yesterdayData.stream()
+                .map(row -> extractValue(row, columnName, columnConfig.getNullHandlingStrategy()))
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // Compare values
         ComparisonResult comparisonResult = compareValues(
@@ -180,17 +165,14 @@ public class DayOverDayComparator extends AbstractComparator {
         boolean thresholdExceeded = isThresholdExceeded(
                 comparisonResult, columnConfig, thresholdConfig.getThresholdValue());
 
-        // Create result
-        ValidationDetailResult result = new ValidationDetailResult();
-        result.setColumnComparisonConfig(columnConfig);
-        result.setActualValue(comparisonResult.getActualValue());
-        result.setExpectedValue(comparisonResult.getExpectedValue());
-        result.setDifferenceValue(comparisonResult.getDifferenceValue());
-        result.setDifferencePercentage(comparisonResult.getDifferencePercentage());
-        result.setThresholdExceeded(thresholdExceeded);
-
-        results.add(result);
-
-        return results;
+        // Create and return result
+        return List.of(ValidationDetailResult.builder()
+                .columnComparisonConfig(columnConfig)
+                .actualValue(comparisonResult.actualValue())
+                .expectedValue(comparisonResult.expectedValue())
+                .differenceValue(comparisonResult.differenceValue())
+                .differencePercentage(comparisonResult.differencePercentage())
+                .thresholdExceeded(thresholdExceeded)
+                .build());
     }
 }

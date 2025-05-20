@@ -1,7 +1,9 @@
 package com.company.datavalidation.api;
 
 import com.company.datavalidation.service.reporting.ReportGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -12,8 +14,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,9 +26,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
-public class ReportControllerTest {
+@DisplayName("Report Controller Tests")
+class ReportControllerTest {
 
     private MockMvc mockMvc;
+    private ObjectMapper objectMapper;
 
     @Mock
     private ReportGenerator reportGenerator;
@@ -36,86 +38,102 @@ public class ReportControllerTest {
     @InjectMocks
     private ReportController reportController;
 
+    // Test data
     private Map<String, Object> dailyReport;
     private Map<String, Object> tableReport;
     private Map<String, Object> trendReport;
     private byte[] excelData;
 
     @BeforeEach
-    public void setup() {
+    void setup() {
         mockMvc = MockMvcBuilders.standaloneSetup(reportController).build();
+        objectMapper = new ObjectMapper();
+        objectMapper.findAndRegisterModules(); // For handling Java 8 date/time
 
         // Setup test data
-        dailyReport = new HashMap<>();
-        dailyReport.put("reportDate", LocalDate.now());
-        dailyReport.put("totalValidations", 100L);
-        dailyReport.put("successfulValidations", 90L);
-        dailyReport.put("failedValidations", 10L);
-        dailyReport.put("successRate", 90.0);
+        // Using Java 21 Map.of for concise immutable maps
 
-        List<Map<String, Object>> tableSummaries = new ArrayList<>();
-        Map<String, Object> tableSummary = new HashMap<>();
-        tableSummary.put("tableName", "orders");
-        tableSummary.put("totalValidations", 50L);
-        tableSummary.put("successfulValidations", 45L);
-        tableSummary.put("failedValidations", 5L);
-        tableSummary.put("successRate", 90.0);
-        tableSummaries.add(tableSummary);
-        dailyReport.put("tableSummaries", tableSummaries);
+        // Example data for table summaries
+        var tableSummary = Map.of(
+                "tableName", "orders",
+                "totalValidations", 50L,
+                "successfulValidations", 45L,
+                "failedValidations", 5L,
+                "successRate", 90.0
+        );
 
-        List<Map<String, Object>> failureDetails = new ArrayList<>();
-        Map<String, Object> failureDetail = new HashMap<>();
-        failureDetail.put("tableName", "orders");
-        failureDetail.put("columnName", "total_amount");
-        failureDetail.put("differencePercentage", 15.0);
-        failureDetails.add(failureDetail);
-        dailyReport.put("failureDetails", failureDetails);
+        // Example data for failure details
+        var failureDetail = Map.of(
+                "tableName", "orders",
+                "columnName", "total_amount",
+                "differencePercentage", 15.0
+        );
+
+        // Daily report
+        dailyReport = Map.of(
+                "reportDate", LocalDate.now(),
+                "totalValidations", 100L,
+                "successfulValidations", 90L,
+                "failedValidations", 10L,
+                "successRate", 90.0,
+                "tableSummaries", List.of(tableSummary),
+                "failureDetails", List.of(failureDetail)
+        );
 
         // Table report
-        tableReport = new HashMap<>();
-        tableReport.put("tableName", "orders");
-        tableReport.put("totalValidations", 50L);
-        tableReport.put("successfulValidations", 45L);
-        tableReport.put("failedValidations", 5L);
-        tableReport.put("successRate", 90.0);
-        tableReport.put("averageExecutionTimeMs", 175.0);
+        var validationDetail = Map.of(
+                "columnName", "total_amount",
+                "comparisonType", "PERCENTAGE",
+                "thresholdExceeded", true
+        );
 
-        List<Map<String, Object>> validationDetails = new ArrayList<>();
-        Map<String, Object> validationDetail = new HashMap<>();
-        validationDetail.put("columnName", "total_amount");
-        validationDetail.put("comparisonType", "PERCENTAGE");
-        validationDetail.put("thresholdExceeded", true);
-        validationDetails.add(validationDetail);
-        tableReport.put("validationDetails", validationDetails);
+        tableReport = Map.of(
+                "tableName", "orders",
+                "totalValidations", 50L,
+                "successfulValidations", 45L,
+                "failedValidations", 5L,
+                "successRate", 90.0,
+                "averageExecutionTimeMs", 175.0,
+                "validationDetails", List.of(validationDetail)
+        );
 
         // Trend report
-        trendReport = new HashMap<>();
-        trendReport.put("startDate", LocalDate.now().minusDays(29));
-        trendReport.put("endDate", LocalDate.now());
+        var trends = List.of(
+                Map.of(
+                        "date", LocalDate.now().minusDays(0),
+                        "totalValidations", 50L,
+                        "successfulValidations", 45L,
+                        "failedValidations", 5L,
+                        "successRate", 90.0
+                ),
+                Map.of(
+                        "date", LocalDate.now().minusDays(1),
+                        "totalValidations",
+                        48L,
+                        "successfulValidations", 44L,
+                        "failedValidations", 4L,
+                        "successRate", 91.7
+                )
+        );
 
-        List<Map<String, Object>> trends = new ArrayList<>();
-        for (int i = 0; i < 30; i++) {
-            Map<String, Object> dayTrend = new HashMap<>();
-            dayTrend.put("date", LocalDate.now().minusDays(i));
-            dayTrend.put("totalValidations", 50L);
-            dayTrend.put("successfulValidations", 45L);
-            dayTrend.put("failedValidations", 5L);
-            dayTrend.put("successRate", 90.0);
-            trends.add(dayTrend);
-        }
-        trendReport.put("trends", trends);
+        trendReport = Map.of(
+                "startDate", LocalDate.now().minusDays(29),
+                "endDate", LocalDate.now(),
+                "trends", trends
+        );
 
         // Excel data
         excelData = "Excel data".getBytes();
     }
 
     @Test
-    public void testGetDailySummary() throws Exception {
+    @DisplayName("Should get daily summary report")
+    void testGetDailySummary() throws Exception {
         when(reportGenerator.generateDailySummaryReport()).thenReturn(dailyReport);
 
         mockMvc.perform(get("/api/v1/reports/daily"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reportDate", notNullValue()))
+                .andExpect(jsonPath("$.reportDate").exists())
                 .andExpect(jsonPath("$.totalValidations", is(100)))
                 .andExpect(jsonPath("$.successfulValidations", is(90)))
                 .andExpect(jsonPath("$.failedValidations", is(10)))
@@ -129,7 +147,8 @@ public class ReportControllerTest {
     }
 
     @Test
-    public void testGetTableReport() throws Exception {
+    @DisplayName("Should get table report")
+    void testGetTableReport() throws Exception {
         when(reportGenerator.generateTableReport("orders")).thenReturn(tableReport);
 
         mockMvc.perform(get("/api/v1/reports/tables/orders"))
@@ -147,21 +166,23 @@ public class ReportControllerTest {
     }
 
     @Test
-    public void testGetTrendReport() throws Exception {
+    @DisplayName("Should get trend report")
+    void testGetTrendReport() throws Exception {
         when(reportGenerator.generateTrendReport(30)).thenReturn(trendReport);
 
         mockMvc.perform(get("/api/v1/reports/trend")
                         .param("days", "30"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.startDate", notNullValue()))
-                .andExpect(jsonPath("$.endDate", notNullValue()))
-                .andExpect(jsonPath("$.trends", hasSize(30)));
+                .andExpect(jsonPath("$.startDate").exists())
+                .andExpect(jsonPath("$.endDate").exists())
+                .andExpect(jsonPath("$.trends").isArray());
 
         verify(reportGenerator).generateTrendReport(30);
     }
 
     @Test
-    public void testExportReport() throws Exception {
+    @DisplayName("Should export report as Excel")
+    void testExportReport() throws Exception {
         when(reportGenerator.exportReportAsExcel(eq("daily"), any(Map.class))).thenReturn(excelData);
 
         mockMvc.perform(get("/api/v1/reports/export")
@@ -176,7 +197,8 @@ public class ReportControllerTest {
     }
 
     @Test
-    public void testExportReport_TableSpecific() throws Exception {
+    @DisplayName("Should export report for specific table")
+    void testExportReportTableSpecific() throws Exception {
         when(reportGenerator.exportReportAsExcel(eq("table"), any(Map.class))).thenReturn(excelData);
 
         mockMvc.perform(get("/api/v1/reports/export")
@@ -192,10 +214,28 @@ public class ReportControllerTest {
     }
 
     @Test
-    public void testExportReport_InvalidFormat() throws Exception {
+    @DisplayName("Should return bad request for invalid format")
+    void testExportReportInvalidFormat() throws Exception {
         mockMvc.perform(get("/api/v1/reports/export")
                         .param("reportType", "daily")
                         .param("format", "invalid"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Should get dashboard statistics")
+    void testGetDashboardStats() throws Exception {
+        // Mock the daily and trend reports
+        when(reportGenerator.generateDailySummaryReport()).thenReturn(dailyReport);
+        when(reportGenerator.generateTrendReport(7)).thenReturn(trendReport);
+
+        mockMvc.perform(get("/api/v1/reports/dashboard"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.validationCount").isNumber())
+                .andExpect(jsonPath("$.successRate").isNumber())
+                .andExpect(jsonPath("$.failureCount").isNumber())
+                .andExpect(jsonPath("$.failuresByTable").exists())
+                .andExpect(jsonPath("$.trendData").exists())
+                .andExpect(jsonPath("$.reportDate").exists());
     }
 }

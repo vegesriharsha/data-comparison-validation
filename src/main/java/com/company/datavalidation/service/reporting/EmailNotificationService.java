@@ -5,44 +5,32 @@ import com.company.datavalidation.repository.EmailNotificationConfigRepository;
 import com.company.datavalidation.repository.ValidationDetailResultRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
-
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class EmailNotificationService {
-
-    private static final Logger logger = LoggerFactory.getLogger(EmailNotificationService.class);
 
     private final JavaMailSender mailSender;
     private final TemplateEngine templateEngine;
     private final EmailNotificationConfigRepository emailNotificationConfigRepository;
     private final ValidationDetailResultRepository validationDetailResultRepository;
-
-    @Autowired
-    public EmailNotificationService(
-            JavaMailSender mailSender,
-            TemplateEngine templateEngine,
-            EmailNotificationConfigRepository emailNotificationConfigRepository,
-            ValidationDetailResultRepository validationDetailResultRepository) {
-        this.mailSender = mailSender;
-        this.templateEngine = templateEngine;
-        this.emailNotificationConfigRepository = emailNotificationConfigRepository;
-        this.validationDetailResultRepository = validationDetailResultRepository;
-    }
 
     /**
      * Send a notification for a validation result
@@ -51,38 +39,55 @@ public class EmailNotificationService {
     public void sendNotification(ValidationResult validationResult) {
         if (validationResult.isSuccess()) {
             // Don't notify for successful validations
+            log.debug("Skipping notification for successful validation: {}", validationResult.getId());
             return;
         }
 
         try {
             // Get validation details that exceeded thresholds
-            List<ValidationDetailResult> failedDetails = validationDetailResultRepository.findByValidationResultIdAndThresholdExceeded(
-                    validationResult.getId(), true);
+            List<ValidationDetailResult> failedDetails = validationDetailResultRepository
+                    .findByValidationResultIdAndThresholdExceeded(
+                            validationResult.getId(), true);
 
             if (failedDetails.isEmpty()) {
                 // No specific failures to report
+                log.debug("No threshold exceeded details found for validation: {}", validationResult.getId());
                 return;
             }
 
             // Get the highest severity among the failures
             Severity highestSeverity = getHighestSeverity(failedDetails);
+            log.debug("Highest severity for validation {}: {}", validationResult.getId(), highestSeverity);
 
             // Get email recipients for this severity
-            List<EmailNotificationConfig> emailConfigs = emailNotificationConfigRepository.findBySeverityLevelAndEnabled(
-                    highestSeverity, true);
+            List<EmailNotificationConfig> emailConfigs = emailNotificationConfigRepository
+                    .findBySeverityLevelAndEnabled(highestSeverity, true);
 
             if (emailConfigs.isEmpty()) {
-                logger.info("No email recipients configured for severity: {}", highestSeverity);
+                log.info("No email recipients configured for severity: {}", highestSeverity);
                 return;
             }
 
-            // Send notifications
-            for (EmailNotificationConfig emailConfig : emailConfigs) {
-                sendValidationFailureEmail(emailConfig.getEmailAddress(), validationResult, failedDetails, highestSeverity);
+            // Send notifications using virtual threads
+            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                for (EmailNotificationConfig emailConfig : emailConfigs) {
+                    executor.submit(() -> {
+                        try {
+                            sendValidationFailureEmail(
+                                    emailConfig.getEmailAddress(),
+                                    validationResult,
+                                    failedDetails,
+                                    highestSeverity
+                            );
+                        } catch (Exception e) {
+                            log.error("Error sending notification to {}", emailConfig.getEmailAddress(), e);
+                        }
+                    });
+                }
             }
 
         } catch (Exception e) {
-            logger.error("Error sending notification for validation result: " + validationResult.getId(), e);
+            log.error("Error preparing notifications for validation result: {}", validationResult.getId(), e);
         }
     }
 
@@ -92,20 +97,13 @@ public class EmailNotificationService {
      * @return Highest severity
      */
     private Severity getHighestSeverity(List<ValidationDetailResult> details) {
-        // Default to LOW if no specific severity is found
-        Severity highestSeverity = Severity.LOW;
-
-        for (ValidationDetailResult detail : details) {
-            ColumnComparisonConfig columnConfig = detail.getColumnComparisonConfig();
-            // Get threshold config - this is simplified, would need proper repository call
-            // ThresholdConfig thresholdConfig = thresholdConfigRepository.findByColumnComparisonConfigIdAndSeverity(
-            //         columnConfig.getId(), anyOf(Severity.values()));
-
-            // For now, just use HIGH as the highest severity
-            return Severity.HIGH;
-        }
-
-        return highestSeverity;
+        return details.stream()
+                .map(detail -> {
+                    // In a real implementation, would fetch the threshold config to get the severity
+                    // For now, just use HIGH as a default (simplified implementation)
+                    return Severity.HIGH;
+                })
+                .reduce(Severity.LOW, Severity::getHighest);
     }
 
     /**
@@ -128,7 +126,7 @@ public class EmailNotificationService {
         helper.setSubject(String.format("[%s] Data Validation Failure: %s",
                 severity, validationResult.getComparisonConfig().getTableName()));
 
-        // Prepare the email content
+        // Prepare the email content using context
         Context context = new Context();
         context.setVariable("tableName", validationResult.getComparisonConfig().getTableName());
         context.setVariable("executionDate", validationResult.getExecutionDate().format(
@@ -149,7 +147,7 @@ public class EmailNotificationService {
         // Send the email
         mailSender.send(message);
 
-        logger.info("Sent validation failure notification to: {}", recipient);
+        log.info("Sent validation failure notification to: {}", recipient);
     }
 
     /**
@@ -158,49 +156,50 @@ public class EmailNotificationService {
      * @return Map representation of the detail
      */
     private Map<String, Object> convertDetailToMap(ValidationDetailResult detail) {
-        Map<String, Object> map = new HashMap<>();
-
-        map.put("columnName", detail.getColumnComparisonConfig().getColumnName());
-        map.put("comparisonType", detail.getColumnComparisonConfig().getComparisonType());
-
-        BigDecimal actualValue = detail.getActualValue();
-        BigDecimal expectedValue = detail.getExpectedValue();
-        BigDecimal differenceValue = detail.getDifferenceValue();
-        BigDecimal differencePercentage = detail.getDifferencePercentage();
-
-        map.put("actualValue", actualValue != null ? actualValue.toString() : "null");
-        map.put("expectedValue", expectedValue != null ? expectedValue.toString() : "null");
-        map.put("differenceValue", differenceValue != null ? differenceValue.toString() : "null");
-        map.put("differencePercentage", differencePercentage != null ?
-                differencePercentage.toString() + "%" : "null");
-
-        return map;
+        return Map.of(
+                "columnName", detail.getColumnComparisonConfig().getColumnName(),
+                "comparisonType", detail.getColumnComparisonConfig().getComparisonType(),
+                "actualValue", detail.getActualValue() != null ? detail.getActualValue().toString() : "null",
+                "expectedValue", detail.getExpectedValue() != null ? detail.getExpectedValue().toString() : "null",
+                "differenceValue", detail.getDifferenceValue() != null ? detail.getDifferenceValue().toString() : "null",
+                "differencePercentage", detail.getDifferencePercentage() != null ?
+                        detail.getDifferencePercentage().toString() + "%" : "null"
+        );
     }
 
     /**
      * Send a daily summary report
      */
-    public void sendDailySummaryReport() {
+    public void sendDailySummaryReport(ReportGenerator reportGenerator) {
         try {
             // Get all email recipients
             List<EmailNotificationConfig> emailConfigs = emailNotificationConfigRepository.findByEnabled(true);
 
             if (emailConfigs.isEmpty()) {
-                logger.info("No email recipients configured for daily summary report");
+                log.info("No email recipients configured for daily summary report");
                 return;
             }
 
             // Generate the report
-            ReportGenerator reportGenerator = new ReportGenerator(null, null); // Inject proper dependencies
             Map<String, Object> report = reportGenerator.generateDailySummaryReport();
+            log.debug("Generated daily summary report with {} table summaries",
+                    ((List<?>) report.get("tableSummaries")).size());
 
-            // Send the report to each recipient
-            for (EmailNotificationConfig emailConfig : emailConfigs) {
-                sendDailySummaryEmail(emailConfig.getEmailAddress(), report);
+            // Send the report to each recipient using virtual threads
+            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                for (EmailNotificationConfig emailConfig : emailConfigs) {
+                    executor.submit(() -> {
+                        try {
+                            sendDailySummaryEmail(emailConfig.getEmailAddress(), report);
+                        } catch (Exception e) {
+                            log.error("Error sending daily summary to {}", emailConfig.getEmailAddress(), e);
+                        }
+                    });
+                }
             }
 
         } catch (Exception e) {
-            logger.error("Error sending daily summary report", e);
+            log.error("Error preparing daily summary report", e);
         }
     }
 
@@ -218,15 +217,9 @@ public class EmailNotificationService {
         helper.setTo(recipient);
         helper.setSubject("Daily Data Validation Summary Report");
 
-        // Prepare the email content
+        // Prepare the email content using context
         Context context = new Context();
-        context.setVariable("reportDate", report.get("reportDate"));
-        context.setVariable("totalValidations", report.get("totalValidations"));
-        context.setVariable("successfulValidations", report.get("successfulValidations"));
-        context.setVariable("failedValidations", report.get("failedValidations"));
-        context.setVariable("successRate", report.get("successRate"));
-        context.setVariable("tableSummaries", report.get("tableSummaries"));
-        context.setVariable("failureDetails", report.get("failureDetails"));
+        context.setVariables(report);
 
         // Process the template
         String emailContent = templateEngine.process("daily-summary-email", context);
@@ -235,6 +228,6 @@ public class EmailNotificationService {
         // Send the email
         mailSender.send(message);
 
-        logger.info("Sent daily summary report to: {}", recipient);
+        log.info("Sent daily summary report to: {}", recipient);
     }
 }

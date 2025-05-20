@@ -1,9 +1,17 @@
 package com.company.datavalidation.model;
 
 import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
 @Table(name = "day_over_day_config")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString
+@EqualsAndHashCode(of = "id")
 public class DayOverDayConfig {
 
     @Id
@@ -12,44 +20,13 @@ public class DayOverDayConfig {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "comparison_config_id", nullable = false)
+    @ToString.Exclude
     private ComparisonConfig comparisonConfig;
 
     @Column(name = "enabled", nullable = false)
+    @Builder.Default
     private boolean enabled = true;
 
     @Column(name = "exclusion_condition")
     private String exclusionCondition;
-
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public ComparisonConfig getComparisonConfig() {
-        return comparisonConfig;
-    }
-
-    public void setComparisonConfig(ComparisonConfig comparisonConfig) {
-        this.comparisonConfig = comparisonConfig;
-    }
-
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public String getExclusionCondition() {
-        return exclusionCondition;
-    }
-
-    public void setExclusionCondition(String exclusionCondition) {
-        this.exclusionCondition = exclusionCondition;
-    }
 }

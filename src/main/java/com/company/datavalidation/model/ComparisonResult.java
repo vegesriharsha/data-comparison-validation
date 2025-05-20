@@ -3,43 +3,57 @@ package com.company.datavalidation.model;
 import java.math.BigDecimal;
 
 /**
- * Class to hold the result of a comparison
+ * Record to hold the result of a comparison
  */
-public class ComparisonResult {
-    private BigDecimal actualValue;
-    private BigDecimal expectedValue;
-    private BigDecimal differenceValue;
-    private BigDecimal differencePercentage;
-
-    public BigDecimal getActualValue() {
-        return actualValue;
+public record ComparisonResult(
+        BigDecimal actualValue,
+        BigDecimal expectedValue,
+        BigDecimal differenceValue,
+        BigDecimal differencePercentage
+) {
+    // Static factory method for easy creation
+    public static ComparisonResult create(
+            BigDecimal actualValue,
+            BigDecimal expectedValue,
+            BigDecimal differenceValue,
+            BigDecimal differencePercentage) {
+        return new ComparisonResult(actualValue, expectedValue, differenceValue, differencePercentage);
     }
 
-    public void setActualValue(BigDecimal actualValue) {
-        this.actualValue = actualValue;
+    // Empty builder method to match the original pattern
+    public static Builder builder() {
+        return new Builder();
     }
 
-    public BigDecimal getExpectedValue() {
-        return expectedValue;
-    }
+    // Builder class for backward compatibility with code that might use the builder pattern
+    public static class Builder {
+        private BigDecimal actualValue;
+        private BigDecimal expectedValue;
+        private BigDecimal differenceValue;
+        private BigDecimal differencePercentage;
 
-    public void setExpectedValue(BigDecimal expectedValue) {
-        this.expectedValue = expectedValue;
-    }
+        public Builder actualValue(BigDecimal actualValue) {
+            this.actualValue = actualValue;
+            return this;
+        }
 
-    public BigDecimal getDifferenceValue() {
-        return differenceValue;
-    }
+        public Builder expectedValue(BigDecimal expectedValue) {
+            this.expectedValue = expectedValue;
+            return this;
+        }
 
-    public void setDifferenceValue(BigDecimal differenceValue) {
-        this.differenceValue = differenceValue;
-    }
+        public Builder differenceValue(BigDecimal differenceValue) {
+            this.differenceValue = differenceValue;
+            return this;
+        }
 
-    public BigDecimal getDifferencePercentage() {
-        return differencePercentage;
-    }
+        public Builder differencePercentage(BigDecimal differencePercentage) {
+            this.differencePercentage = differencePercentage;
+            return this;
+        }
 
-    public void setDifferencePercentage(BigDecimal differencePercentage) {
-        this.differencePercentage = differencePercentage;
+        public ComparisonResult build() {
+            return new ComparisonResult(actualValue, expectedValue, differenceValue, differencePercentage);
+        }
     }
 }

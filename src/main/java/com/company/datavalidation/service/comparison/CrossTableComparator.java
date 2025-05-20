@@ -2,17 +2,16 @@ package com.company.datavalidation.service.comparison;
 
 import com.company.datavalidation.model.*;
 import com.company.datavalidation.repository.DynamicTableRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class CrossTableComparator extends AbstractComparator {
 
-    @Autowired
     public CrossTableComparator(DynamicTableRepository dynamicTableRepository) {
         super(dynamicTableRepository);
     }
@@ -21,66 +20,72 @@ public class CrossTableComparator extends AbstractComparator {
      * Perform cross-table comparison
      * @param config Cross-table configuration
      * @param columnConfigs List of column configuration
-     * @param thresholdConfigs List of threshold configurations
+     * @param thresholdConfigs Map of column config ID to threshold configuration
      * @return List of validation detail results
      */
     public List<ValidationDetailResult> compare(CrossTableConfig config,
                                                 List<ColumnComparisonConfig> columnConfigs,
                                                 Map<Long, ThresholdConfig> thresholdConfigs) {
 
+        log.debug("Starting cross-table comparison for config: {}", config.getId());
+
         ComparisonConfig sourceConfig = config.getSourceComparisonConfig();
         String sourceTable = sourceConfig.getTableName();
         String targetTable = config.getTargetTableName();
         String joinCondition = config.getJoinCondition();
 
+        // Create source and target column mapping
+        record ColumnMapping(String sourceColumn, String targetColumn, ColumnComparisonConfig config) {}
+
+        var columnMappings = columnConfigs.stream()
+                .map(columnConfig -> {
+                    String sourceColumn = columnConfig.getColumnName();
+                    String targetColumn = columnConfig.getTargetColumnName();
+
+                    // Use same column name if target not specified
+                    if (targetColumn == null) {
+                        targetColumn = sourceColumn;
+                    }
+
+                    return new ColumnMapping(sourceColumn, targetColumn, columnConfig);
+                })
+                .toList();
+
         // Extract source and target column names for query
-        List<String> sourceColumns = new ArrayList<>();
-        List<String> targetColumns = new ArrayList<>();
+        var sourceColumns = columnMappings.stream()
+                .map(ColumnMapping::sourceColumn)
+                .toList();
 
-        Map<String, ColumnComparisonConfig> columnConfigMap = new HashMap<>();
-
-        for (ColumnComparisonConfig columnConfig : columnConfigs) {
-            String sourceColumn = columnConfig.getColumnName();
-            String targetColumn = columnConfig.getTargetColumnName();
-
-            if (targetColumn == null) {
-                targetColumn = sourceColumn; // Use same column name if target not specified
-            }
-
-            sourceColumns.add(sourceColumn);
-            targetColumns.add(targetColumn);
-
-            // Map source column to config
-            columnConfigMap.put(sourceColumn, columnConfig);
-        }
+        var targetColumns = columnMappings.stream()
+                .map(ColumnMapping::targetColumn)
+                .toList();
 
         // Assume a standard column name for date
-        String dateColumn = "created_date"; // This should be configurable
+        String dateColumn = "created_date";
 
         // Execute cross-table query
-        List<Map<String, Object>> crossTableData = dynamicTableRepository.executeCrossTableQuery(
+        var crossTableData = dynamicTableRepository.executeCrossTableQuery(
                 sourceTable, targetTable, sourceColumns, targetColumns, joinCondition,
-                dateColumn, null); // No exclusion condition for now
+                dateColumn, null);
 
         // Perform comparison for each row and column
         List<ValidationDetailResult> results = new ArrayList<>();
 
-        for (Map<String, Object> row : crossTableData) {
-            for (String sourceColumn : sourceColumns) {
-                int index = sourceColumns.indexOf(sourceColumn);
-                String targetColumn = targetColumns.get(index);
-
-                ColumnComparisonConfig columnConfig = columnConfigMap.get(sourceColumn);
-                ThresholdConfig thresholdConfig = thresholdConfigs.get(columnConfig.getId());
+        for (var row : crossTableData) {
+            for (var mapping : columnMappings) {
+                var columnConfig = mapping.config();
+                var thresholdConfig = thresholdConfigs.get(columnConfig.getId());
 
                 if (thresholdConfig == null) {
-                    // Skip comparison if no threshold is defined
+                    log.warn("No threshold configuration found for column config: {}", columnConfig.getId());
                     continue;
                 }
 
                 // Extract source and target values
-                BigDecimal sourceValue = extractValue(row, "s_" + sourceColumn, columnConfig.getNullHandlingStrategy());
-                BigDecimal targetValue = extractValue(row, "t_" + targetColumn, columnConfig.getNullHandlingStrategy());
+                BigDecimal sourceValue = extractValue(row, "s_" + mapping.sourceColumn(),
+                        columnConfig.getNullHandlingStrategy());
+                BigDecimal targetValue = extractValue(row, "t_" + mapping.targetColumn(),
+                        columnConfig.getNullHandlingStrategy());
 
                 // Skip comparison if either value is null
                 if (sourceValue == null || targetValue == null) {
@@ -96,13 +101,14 @@ public class CrossTableComparator extends AbstractComparator {
                         comparisonResult, columnConfig, thresholdConfig.getThresholdValue());
 
                 // Create result
-                ValidationDetailResult result = new ValidationDetailResult();
-                result.setColumnComparisonConfig(columnConfig);
-                result.setActualValue(comparisonResult.getActualValue());
-                result.setExpectedValue(comparisonResult.getExpectedValue());
-                result.setDifferenceValue(comparisonResult.getDifferenceValue());
-                result.setDifferencePercentage(comparisonResult.getDifferencePercentage());
-                result.setThresholdExceeded(thresholdExceeded);
+                var result = ValidationDetailResult.builder()
+                        .columnComparisonConfig(columnConfig)
+                        .actualValue(comparisonResult.actualValue())
+                        .expectedValue(comparisonResult.expectedValue())
+                        .differenceValue(comparisonResult.differenceValue())
+                        .differencePercentage(comparisonResult.differencePercentage())
+                        .thresholdExceeded(thresholdExceeded)
+                        .build();
 
                 results.add(result);
             }

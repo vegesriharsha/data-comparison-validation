@@ -1,48 +1,26 @@
 package com.company.datavalidation.repository;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Repository
+@RequiredArgsConstructor
+@Slf4j
 public class DynamicTableRepository {
 
     private final JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    public DynamicTableRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
-
-    /**
-     * Execute a query and return the results as a list of maps
-     * @param query SQL query to execute
-     * @return List of maps where each map represents a row with column name as key
-     */
-    public List<Map<String, Object>> executeQuery(String query) {
-        return jdbcTemplate.query(query, new RowMapper<Map<String, Object>>() {
-            @Override
-            public Map<String, Object> mapRow(ResultSet rs, int rowNum) throws SQLException {
-                Map<String, Object> row = new HashMap<>();
-                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
-                    String columnName = rs.getMetaData().getColumnName(i);
-                    Object value = rs.getObject(i);
-                    row.put(columnName, value);
-                }
-                return row;
-            }
-        });
-    }
 
     /**
      * Get data from a table for the current day
@@ -69,34 +47,26 @@ public class DynamicTableRepository {
      */
     public List<Map<String, Object>> getDataForDate(String tableName, List<String> columnNames,
                                                     String dateColumn, LocalDate date, String exclusionCondition) {
-        StringBuilder queryBuilder = new StringBuilder("SELECT ");
+        // Format columns for select clause
+        String columnsClause = columnNames.stream().collect(Collectors.joining(", "));
 
-        // Add columns to select clause
-        for (int i = 0; i < columnNames.size(); i++) {
-            queryBuilder.append(columnNames.get(i));
-            if (i < columnNames.size() - 1) {
-                queryBuilder.append(", ");
-            }
-        }
+        // Build query with modern text block
+        String query = """
+            SELECT %s
+            FROM %s
+            WHERE CONVERT(date, %s) = ?
+            %s
+            """.formatted(
+                columnsClause,
+                tableName,
+                dateColumn,
+                exclusionCondition != null && !exclusionCondition.isEmpty()
+                        ? "AND " + exclusionCondition
+                        : ""
+        );
 
-        queryBuilder.append(" FROM ").append(tableName);
-        queryBuilder.append(" WHERE CONVERT(date, ").append(dateColumn).append(") = ?");
-
-        if (exclusionCondition != null && !exclusionCondition.trim().isEmpty()) {
-            queryBuilder.append(" AND ").append(exclusionCondition);
-        }
-
-        return jdbcTemplate.query(queryBuilder.toString(), new RowMapper<Map<String, Object>>() {
-            @Override
-            public Map<String, Object> mapRow(ResultSet rs, int rowNum) throws SQLException {
-                Map<String, Object> row = new HashMap<>();
-                for (String columnName : columnNames) {
-                    Object value = rs.getObject(columnName);
-                    row.put(columnName, value);
-                }
-                return row;
-            }
-        }, date);
+        log.debug("Executing query for date {}: {}", date, query);
+        return jdbcTemplate.query(query, this::mapRowWithColumns, date);
     }
 
     /**
@@ -128,50 +98,39 @@ public class DynamicTableRepository {
                                                             List<String> sourceColumns, List<String> targetColumns,
                                                             String joinCondition, String dateColumn,
                                                             String exclusionCondition) {
-        StringBuilder queryBuilder = new StringBuilder("SELECT ");
+        // Format source columns for select clause
+        String sourceColumnsClause = sourceColumns.stream()
+                .map(col -> "s." + col + " AS s_" + col)
+                .collect(Collectors.joining(", "));
 
-        // Add source columns
-        for (int i = 0; i < sourceColumns.size(); i++) {
-            queryBuilder.append("s.").append(sourceColumns.get(i)).append(" AS s_").append(sourceColumns.get(i));
-            queryBuilder.append(", ");
-        }
+        // Format target columns for select clause
+        String targetColumnsClause = targetColumns.stream()
+                .map(col -> "t." + col + " AS t_" + col)
+                .collect(Collectors.joining(", "));
 
-        // Add target columns
-        for (int i = 0; i < targetColumns.size(); i++) {
-            queryBuilder.append("t.").append(targetColumns.get(i)).append(" AS t_").append(targetColumns.get(i));
-            if (i < targetColumns.size() - 1) {
-                queryBuilder.append(", ");
-            }
-        }
+        // Build the combined columns clause
+        String columnsClause = String.join(", ", sourceColumnsClause, targetColumnsClause);
 
-        queryBuilder.append(" FROM ").append(sourceTable).append(" s");
-        queryBuilder.append(" JOIN ").append(targetTable).append(" t ON ").append(joinCondition);
-        queryBuilder.append(" WHERE CONVERT(date, s.").append(dateColumn).append(") = CAST(GETDATE() AS date)");
+        // Build query with modern text block
+        String query = """
+            SELECT %s
+            FROM %s s
+            JOIN %s t ON %s
+            WHERE CONVERT(date, s.%s) = CAST(GETDATE() AS date)
+            %s
+            """.formatted(
+                columnsClause,
+                sourceTable,
+                targetTable,
+                joinCondition,
+                dateColumn,
+                exclusionCondition != null && !exclusionCondition.isEmpty()
+                        ? "AND " + exclusionCondition
+                        : ""
+        );
 
-        if (exclusionCondition != null && !exclusionCondition.trim().isEmpty()) {
-            queryBuilder.append(" AND ").append(exclusionCondition);
-        }
-
-        return jdbcTemplate.query(queryBuilder.toString(), new RowMapper<Map<String, Object>>() {
-            @Override
-            public Map<String, Object> mapRow(ResultSet rs, int rowNum) throws SQLException {
-                Map<String, Object> row = new HashMap<>();
-
-                // Map source columns
-                for (String columnName : sourceColumns) {
-                    Object value = rs.getObject("s_" + columnName);
-                    row.put("s_" + columnName, value);
-                }
-
-                // Map target columns
-                for (String columnName : targetColumns) {
-                    Object value = rs.getObject("t_" + columnName);
-                    row.put("t_" + columnName, value);
-                }
-
-                return row;
-            }
-        });
+        log.debug("Executing cross-table query: {}", query);
+        return jdbcTemplate.query(query, this::mapRow);
     }
 
     /**
@@ -186,15 +145,88 @@ public class DynamicTableRepository {
      */
     public BigDecimal executeAggregateQuery(String tableName, String aggregateFunction, String columnName,
                                             String dateColumn, LocalDate date, String exclusionCondition) {
-        StringBuilder queryBuilder = new StringBuilder("SELECT ");
-        queryBuilder.append(aggregateFunction).append("(").append(columnName).append(") AS result");
-        queryBuilder.append(" FROM ").append(tableName);
-        queryBuilder.append(" WHERE CONVERT(date, ").append(dateColumn).append(") = ?");
+        // Build query with modern text block
+        String query = """
+            SELECT %s(%s) AS result
+            FROM %s
+            WHERE CONVERT(date, %s) = ?
+            %s
+            """.formatted(
+                aggregateFunction,
+                columnName,
+                tableName,
+                dateColumn,
+                exclusionCondition != null && !exclusionCondition.isEmpty()
+                        ? "AND " + exclusionCondition
+                        : ""
+        );
 
-        if (exclusionCondition != null && !exclusionCondition.trim().isEmpty()) {
-            queryBuilder.append(" AND ").append(exclusionCondition);
-        }
+        log.debug("Executing aggregate query for date {}: {}", date, query);
+        return jdbcTemplate.queryForObject(query, BigDecimal.class, date);
+    }
 
-        return jdbcTemplate.queryForObject(queryBuilder.toString(), BigDecimal.class, date);
+    /**
+     * Row mapper for query results using Java streams
+     */
+    private Map<String, Object> mapRow(ResultSet rs, int rowNum) throws SQLException {
+        ResultSetMetaData metaData = rs.getMetaData();
+        int columnCount = metaData.getColumnCount();
+
+        // Use IntStream to iterate through column indices (1-based)
+        return IntStream.rangeClosed(1, columnCount)
+                .boxed()
+                .collect(Collectors.toMap(
+                        i -> {
+                            try {
+                                return metaData.getColumnName(i);
+                            } catch (SQLException e) {
+                                log.error("Error getting column name for index {}", i, e);
+                                return "column_" + i; // Fallback column name
+                            }
+                        },
+                        i -> {
+                            try {
+                                return rs.getObject(i);
+                            } catch (SQLException e) {
+                                log.error("Error getting column value for index {}", i, e);
+                                return null;
+                            }
+                        },
+                        // In case of duplicate keys (should not happen in SQL results)
+                        (existing, replacement) -> {
+                            log.warn("Duplicate column name found in result set, using first value");
+                            return existing;
+                        }
+                ));
+    }
+
+    /**
+     * Row mapper optimized for specified columns using Java streams
+     */
+    private Map<String, Object> mapRowWithColumns(ResultSet rs, int rowNum) throws SQLException {
+        ResultSetMetaData metaData = rs.getMetaData();
+        int columnCount = metaData.getColumnCount();
+
+        // Use IntStream to iterate through column indices (1-based)
+        return IntStream.rangeClosed(1, columnCount)
+                .boxed()
+                .collect(Collectors.toMap(
+                        i -> {
+                            try {
+                                return metaData.getColumnName(i);
+                            } catch (SQLException e) {
+                                log.error("Error getting column name for index {}", i, e);
+                                return "column_" + i; // Fallback column name
+                            }
+                        },
+                        i -> {
+                            try {
+                                return rs.getObject(i);
+                            } catch (SQLException e) {
+                                log.error("Error getting column value for index {}", i, e);
+                                return null;
+                            }
+                        }
+                ));
     }
 }

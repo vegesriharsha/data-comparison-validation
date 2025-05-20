@@ -1,9 +1,17 @@
 package com.company.datavalidation.model;
 
 import jakarta.persistence.*;
+import lombok.*;
 
 @Entity
 @Table(name = "cross_table_config")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@ToString
+@EqualsAndHashCode(of = "id")
 public class CrossTableConfig {
 
     @Id
@@ -12,6 +20,7 @@ public class CrossTableConfig {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_comparison_config_id", nullable = false)
+    @ToString.Exclude
     private ComparisonConfig sourceComparisonConfig;
 
     @Column(name = "target_table_name", nullable = false)
@@ -21,46 +30,6 @@ public class CrossTableConfig {
     private String joinCondition;
 
     @Column(name = "enabled", nullable = false)
+    @Builder.Default
     private boolean enabled = true;
-
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public ComparisonConfig getSourceComparisonConfig() {
-        return sourceComparisonConfig;
-    }
-
-    public void setSourceComparisonConfig(ComparisonConfig sourceComparisonConfig) {
-        this.sourceComparisonConfig = sourceComparisonConfig;
-    }
-
-    public String getTargetTableName() {
-        return targetTableName;
-    }
-
-    public void setTargetTableName(String targetTableName) {
-        this.targetTableName = targetTableName;
-    }
-
-    public String getJoinCondition() {
-        return joinCondition;
-    }
-
-    public void setJoinCondition(String joinCondition) {
-        this.joinCondition = joinCondition;
-    }
-
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
 }

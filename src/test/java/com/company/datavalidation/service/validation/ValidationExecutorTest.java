@@ -15,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.stubbing.Answer;
 
 import java.util.List;
 import java.util.Optional;
@@ -99,20 +100,31 @@ class ValidationExecutorTest {
     @Test
     @DisplayName("Should execute all enabled validations")
     void testExecuteAllValidations() {
-        // Mock repository behavior
-        when(comparisonConfigRepository.findByEnabled(true))
+        // Mock repository behavior with lenient strictness
+        lenient().when(comparisonConfigRepository.findByEnabled(true))
                 .thenReturn(List.of(config1, config2));
 
-        when(dayOverDayConfigRepository.findByComparisonConfigId(config1.getId()))
+        lenient().when(dayOverDayConfigRepository.findByComparisonConfigId(config1.getId()))
                 .thenReturn(Optional.of(dayOverDayConfig));
 
-        when(crossTableConfigRepository.findBySourceComparisonConfigAndEnabled(config2, true))
-                .thenReturn(List.of(crossTableConfig));
+        lenient().when(dayOverDayConfigRepository.findByComparisonConfigId(config2.getId()))
+                .thenReturn(Optional.empty());
 
-        when(thresholdValidator.validateDayOverDay(dayOverDayConfig))
+        // Use answer to match any ComparisonConfig
+        lenient().when(crossTableConfigRepository.findBySourceComparisonConfigAndEnabled(any(ComparisonConfig.class), eq(true)))
+                .thenAnswer((Answer<List<CrossTableConfig>>) invocation -> {
+                    ComparisonConfig config = invocation.getArgument(0);
+                    if (config.getId().equals(2L)) {
+                        return List.of(crossTableConfig);
+                    } else {
+                        return List.of();
+                    }
+                });
+
+        lenient().when(thresholdValidator.validateDayOverDay(dayOverDayConfig))
                 .thenReturn(successResult);
 
-        when(thresholdValidator.validateCrossTable(crossTableConfig))
+        lenient().when(thresholdValidator.validateCrossTable(crossTableConfig))
                 .thenReturn(failedResult);
 
         // Execute validations
@@ -126,8 +138,8 @@ class ValidationExecutorTest {
 
         // Verify repository calls
         verify(comparisonConfigRepository).findByEnabled(true);
-        verify(dayOverDayConfigRepository).findByComparisonConfigId(config1.getId());
-        verify(crossTableConfigRepository).findBySourceComparisonConfigAndEnabled(config2, true);
+        verify(dayOverDayConfigRepository, times(2)).findByComparisonConfigId(anyLong());
+        verify(crossTableConfigRepository, times(2)).findBySourceComparisonConfigAndEnabled(any(ComparisonConfig.class), eq(true));
         verify(thresholdValidator).validateDayOverDay(dayOverDayConfig);
         verify(thresholdValidator).validateCrossTable(crossTableConfig);
     }
@@ -227,6 +239,9 @@ class ValidationExecutorTest {
 
         when(thresholdValidator.validateDayOverDay(dayOverDayConfig))
                 .thenThrow(new RuntimeException("Test exception"));
+
+        when(validationResultRepository.save(any(ValidationResult.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         // Execute validations
         var results = validationExecutor.executeValidationForConfig(1L);

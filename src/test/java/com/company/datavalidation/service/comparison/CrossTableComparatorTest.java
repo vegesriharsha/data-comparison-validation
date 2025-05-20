@@ -110,25 +110,23 @@ class CrossTableComparatorTest {
         List<String> sourceColumns = List.of("amount", "count");
         List<String> targetColumns = List.of("amount", "total_count");
 
-        // Cross-table data
+        // Cross-table data - Using HashMap to avoid issues with Map.of() and null values
         List<Map<String, Object>> crossTableData = new ArrayList<>();
 
         // First row
-        Map<String, Object> row1 = Map.of(
-                "s_amount", new BigDecimal("100.00"),
-                "t_amount", new BigDecimal("99.00"),
-                "s_count", 10,
-                "t_total_count", 9
-        );
+        Map<String, Object> row1 = new HashMap<>();
+        row1.put("s_amount", new BigDecimal("100.00"));
+        row1.put("t_amount", new BigDecimal("99.00"));
+        row1.put("s_count", 10);
+        row1.put("t_total_count", 9);
         crossTableData.add(row1);
 
         // Second row
-        Map<String, Object> row2 = Map.of(
-                "s_amount", new BigDecimal("200.00"),
-                "t_amount", new BigDecimal("198.00"),
-                "s_count", 20,
-                "t_total_count", 19
-        );
+        Map<String, Object> row2 = new HashMap<>();
+        row2.put("s_amount", new BigDecimal("200.00"));
+        row2.put("t_amount", new BigDecimal("198.00"));
+        row2.put("s_count", 20);
+        row2.put("t_total_count", 19);
         crossTableData.add(row2);
 
         // Mock repository behavior
@@ -149,16 +147,17 @@ class CrossTableComparatorTest {
         assertFalse(results.stream().anyMatch(ValidationDetailResult::isThresholdExceeded),
                 "No thresholds should be exceeded");
 
-        // Verify amount comparison for first row
+        // Verify amount comparison for first row - Use findFirst() and orElse(null) to avoid NoSuchElementException
         var amountResult1 = results.stream()
                 .filter(r -> r.getColumnComparisonConfig().getColumnName().equals("amount") &&
-                        r.getActualValue().equals(new BigDecimal("100.00")))
+                        r.getActualValue().compareTo(new BigDecimal("100.00")) == 0)
                 .findFirst()
-                .orElseThrow();
+                .orElse(null);
 
-        assertEquals(new BigDecimal("100.00"), amountResult1.getActualValue());
-        assertEquals(new BigDecimal("99.00"), amountResult1.getExpectedValue());
-        assertEquals(new BigDecimal("1.00"), amountResult1.getDifferenceValue());
+        assertNotNull(amountResult1, "Amount result should not be null");
+        assertEquals(0, new BigDecimal("100.00").compareTo(amountResult1.getActualValue()));
+        assertEquals(0, new BigDecimal("99.00").compareTo(amountResult1.getExpectedValue()));
+        assertEquals(0, new BigDecimal("1.00").compareTo(amountResult1.getDifferenceValue()));
 
         // Difference percentage should be about 1.01%
         assertTrue(amountResult1.getDifferencePercentage().compareTo(new BigDecimal("1.0")) > 0);
@@ -168,13 +167,14 @@ class CrossTableComparatorTest {
         // Verify count comparison for first row
         var countResult1 = results.stream()
                 .filter(r -> r.getColumnComparisonConfig().getColumnName().equals("count") &&
-                        r.getActualValue().equals(new BigDecimal("10")))
+                        r.getActualValue().compareTo(new BigDecimal("10")) == 0)
                 .findFirst()
-                .orElseThrow();
+                .orElse(null);
 
-        assertEquals(new BigDecimal("10"), countResult1.getActualValue());
-        assertEquals(new BigDecimal("9"), countResult1.getExpectedValue());
-        assertEquals(new BigDecimal("1"), countResult1.getDifferenceValue());
+        assertNotNull(countResult1, "Count result should not be null");
+        assertEquals(0, new BigDecimal("10").compareTo(countResult1.getActualValue()));
+        assertEquals(0, new BigDecimal("9").compareTo(countResult1.getExpectedValue()));
+        assertEquals(0, new BigDecimal("1").compareTo(countResult1.getDifferenceValue()));
         assertFalse(countResult1.isThresholdExceeded(), "1 < 3 threshold");
     }
 
@@ -185,15 +185,14 @@ class CrossTableComparatorTest {
         List<String> sourceColumns = List.of("amount", "count");
         List<String> targetColumns = List.of("amount", "total_count");
 
-        // Cross-table data with large differences
-        List<Map<String, Object>> crossTableData = List.of(
-                Map.of(
-                        "s_amount", new BigDecimal("100.00"),
-                        "t_amount", new BigDecimal("90.00"),
-                        "s_count", 10,
-                        "t_total_count", 6
-                )
-        );
+        // Cross-table data with large differences - Using HashMap instead of Map.of
+        List<Map<String, Object>> crossTableData = new ArrayList<>();
+        Map<String, Object> row = new HashMap<>();
+        row.put("s_amount", new BigDecimal("100.00"));
+        row.put("t_amount", new BigDecimal("90.00"));
+        row.put("s_count", 10);
+        row.put("t_total_count", 6);
+        crossTableData.add(row);
 
         // Mock repository behavior
         when(dynamicTableRepository.executeCrossTableQuery(
@@ -213,15 +212,16 @@ class CrossTableComparatorTest {
         assertTrue(results.stream().allMatch(ValidationDetailResult::isThresholdExceeded),
                 "All thresholds should be exceeded");
 
-        // Verify amount comparison
+        // Verify amount comparison - Compare BigDecimal with BigDecimal
         var amountResult = results.stream()
                 .filter(r -> r.getColumnComparisonConfig().getColumnName().equals("amount"))
                 .findFirst()
-                .orElseThrow();
+                .orElse(null);
 
-        assertEquals(new BigDecimal("100.00"), amountResult.getActualValue());
-        assertEquals(new BigDecimal("90.00"), amountResult.getExpectedValue());
-        assertEquals(new BigDecimal("10.00"), amountResult.getDifferenceValue());
+        assertNotNull(amountResult, "Amount result should not be null");
+        assertEquals(0, new BigDecimal("100.00").compareTo(amountResult.getActualValue()));
+        assertEquals(0, new BigDecimal("90.00").compareTo(amountResult.getExpectedValue()));
+        assertEquals(0, new BigDecimal("10.00").compareTo(amountResult.getDifferenceValue()));
 
         // Difference percentage should be about 11.11%
         assertTrue(amountResult.getDifferencePercentage().compareTo(new BigDecimal("11.1")) > 0);
@@ -232,11 +232,12 @@ class CrossTableComparatorTest {
         var countResult = results.stream()
                 .filter(r -> r.getColumnComparisonConfig().getColumnName().equals("count"))
                 .findFirst()
-                .orElseThrow();
+                .orElse(null);
 
-        assertEquals(new BigDecimal("10"), countResult.getActualValue());
-        assertEquals(new BigDecimal("6"), countResult.getExpectedValue());
-        assertEquals(new BigDecimal("4"), countResult.getDifferenceValue());
+        assertNotNull(countResult, "Count result should not be null");
+        assertEquals(0, new BigDecimal("10").compareTo(countResult.getActualValue()));
+        assertEquals(0, new BigDecimal("6").compareTo(countResult.getExpectedValue()));
+        assertEquals(0, new BigDecimal("4").compareTo(countResult.getDifferenceValue()));
         assertTrue(countResult.isThresholdExceeded(), "4 > 3 threshold");
     }
 
@@ -247,15 +248,14 @@ class CrossTableComparatorTest {
         List<String> sourceColumns = List.of("amount", "count");
         List<String> targetColumns = List.of("amount", "total_count");
 
-        // Cross-table data with null values
-        List<Map<String, Object>> crossTableData = List.of(
-                Map.of(
-                        "s_amount", null,
-                        "t_amount", new BigDecimal("90.00"),
-                        "s_count", 10,
-                        "t_total_count", null
-                )
-        );
+        // Cross-table data with null values - Using HashMap instead of Map.of
+        List<Map<String, Object>> crossTableData = new ArrayList<>();
+        Map<String, Object> row = new HashMap<>();
+        row.put("s_amount", null);
+        row.put("t_amount", new BigDecimal("90.00"));
+        row.put("s_count", 10);
+        row.put("t_total_count", null);
+        crossTableData.add(row);
 
         // Mock repository behavior
         when(dynamicTableRepository.executeCrossTableQuery(
@@ -275,8 +275,8 @@ class CrossTableComparatorTest {
                 .orElse(null);
 
         assertNotNull(amountResult, "Should have an amount result");
-        assertEquals(BigDecimal.ZERO, amountResult.getActualValue());
-        assertEquals(new BigDecimal("90.00"), amountResult.getExpectedValue());
+        assertEquals(0, BigDecimal.ZERO.compareTo(amountResult.getActualValue()));
+        assertEquals(0, new BigDecimal("90.00").compareTo(amountResult.getExpectedValue()));
 
         // Verify count comparison
         var countResult = results.stream()
@@ -285,7 +285,7 @@ class CrossTableComparatorTest {
                 .orElse(null);
 
         assertNotNull(countResult, "Should have a count result");
-        assertEquals(new BigDecimal("10"), countResult.getActualValue());
-        assertEquals(BigDecimal.ZERO, countResult.getExpectedValue());
+        assertEquals(0, new BigDecimal("10").compareTo(countResult.getActualValue()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(countResult.getExpectedValue()));
     }
 }

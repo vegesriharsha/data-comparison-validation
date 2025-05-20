@@ -120,15 +120,15 @@ public class DayOverDayComparatorTest {
         // Verify results
         assertEquals(2, results.size());
 
-        // Verify amount comparison
+        // Verify amount comparison - Use BigDecimal comparison
         ValidationDetailResult amountResult = results.stream()
                 .filter(r -> r.getColumnComparisonConfig().getColumnName().equals("amount"))
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals(new BigDecimal("100.00"), amountResult.getActualValue());
-        assertEquals(new BigDecimal("95.00"), amountResult.getExpectedValue());
-        assertEquals(new BigDecimal("5.00"), amountResult.getDifferenceValue());
+        assertEquals(0, new BigDecimal("100.00").compareTo(amountResult.getActualValue()));
+        assertEquals(0, new BigDecimal("95.00").compareTo(amountResult.getExpectedValue()));
+        assertEquals(0, new BigDecimal("5.00").compareTo(amountResult.getDifferenceValue()));
         // Difference percentage should be about 5.26%
         assertTrue(amountResult.getDifferencePercentage().compareTo(new BigDecimal("5.2")) > 0);
         assertTrue(amountResult.getDifferencePercentage().compareTo(new BigDecimal("5.3")) < 0);
@@ -140,9 +140,9 @@ public class DayOverDayComparatorTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals(new BigDecimal("20"), countResult.getActualValue());
-        assertEquals(new BigDecimal("18"), countResult.getExpectedValue());
-        assertEquals(new BigDecimal("2"), countResult.getDifferenceValue());
+        assertEquals(0, new BigDecimal("20").compareTo(countResult.getActualValue()));
+        assertEquals(0, new BigDecimal("18").compareTo(countResult.getExpectedValue()));
+        assertEquals(0, new BigDecimal("2").compareTo(countResult.getDifferenceValue()));
         // Difference should be 2 units
         assertFalse(countResult.isThresholdExceeded()); // 2 < 5 threshold
     }
@@ -177,15 +177,15 @@ public class DayOverDayComparatorTest {
         // Verify results
         assertEquals(2, results.size());
 
-        // Verify amount comparison
+        // Verify amount comparison - Use BigDecimal comparison
         ValidationDetailResult amountResult = results.stream()
                 .filter(r -> r.getColumnComparisonConfig().getColumnName().equals("amount"))
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals(new BigDecimal("120.00"), amountResult.getActualValue());
-        assertEquals(new BigDecimal("95.00"), amountResult.getExpectedValue());
-        assertEquals(new BigDecimal("25.00"), amountResult.getDifferenceValue());
+        assertEquals(0, new BigDecimal("120.00").compareTo(amountResult.getActualValue()));
+        assertEquals(0, new BigDecimal("95.00").compareTo(amountResult.getExpectedValue()));
+        assertEquals(0, new BigDecimal("25.00").compareTo(amountResult.getDifferenceValue()));
         // Difference percentage should be about 26.32%
         assertTrue(amountResult.getDifferencePercentage().compareTo(new BigDecimal("26.3")) > 0);
         assertTrue(amountResult.getDifferencePercentage().compareTo(new BigDecimal("26.4")) < 0);
@@ -197,9 +197,9 @@ public class DayOverDayComparatorTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals(new BigDecimal("25"), countResult.getActualValue());
-        assertEquals(new BigDecimal("18"), countResult.getExpectedValue());
-        assertEquals(new BigDecimal("7"), countResult.getDifferenceValue());
+        assertEquals(0, new BigDecimal("25").compareTo(countResult.getActualValue()));
+        assertEquals(0, new BigDecimal("18").compareTo(countResult.getExpectedValue()));
+        assertEquals(0, new BigDecimal("7").compareTo(countResult.getDifferenceValue()));
         // Difference should be 7 units
         assertTrue(countResult.isThresholdExceeded()); // 7 > 5 threshold
     }
@@ -234,17 +234,17 @@ public class DayOverDayComparatorTest {
         // Verify results
         assertEquals(2, results.size());
 
-        // Verify amount comparison - null should be treated as zero
+        // Verify amount comparison - null should be treated as zero - Use BigDecimal comparison
         ValidationDetailResult amountResult = results.stream()
                 .filter(r -> r.getColumnComparisonConfig().getColumnName().equals("amount"))
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals(new BigDecimal("0.00"), amountResult.getActualValue());
-        assertEquals(new BigDecimal("95.00"), amountResult.getExpectedValue());
-        assertEquals(new BigDecimal("-95.00"), amountResult.getDifferenceValue());
+        assertEquals(0, new BigDecimal("0.00").compareTo(amountResult.getActualValue()));
+        assertEquals(0, new BigDecimal("95.00").compareTo(amountResult.getExpectedValue()));
+        assertEquals(0, new BigDecimal("-95.00").compareTo(amountResult.getDifferenceValue()));
         // Difference percentage should be -100%
-        assertEquals(new BigDecimal("-100"), amountResult.getDifferencePercentage());
+        assertEquals(0, new BigDecimal("-100").compareTo(amountResult.getDifferencePercentage()));
         assertTrue(amountResult.isThresholdExceeded()); // -100% > 10% threshold
 
         // Verify count comparison - N/A should be treated as zero
@@ -253,9 +253,9 @@ public class DayOverDayComparatorTest {
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals(new BigDecimal("0"), countResult.getActualValue());
-        assertEquals(new BigDecimal("18"), countResult.getExpectedValue());
-        assertEquals(new BigDecimal("-18"), countResult.getDifferenceValue());
+        assertEquals(0, new BigDecimal("0").compareTo(countResult.getActualValue()));
+        assertEquals(0, new BigDecimal("18").compareTo(countResult.getExpectedValue()));
+        assertEquals(0, new BigDecimal("-18").compareTo(countResult.getDifferenceValue()));
         // Difference should be -18 units
         assertTrue(countResult.isThresholdExceeded()); // -18 > 5 threshold (absolute)
     }

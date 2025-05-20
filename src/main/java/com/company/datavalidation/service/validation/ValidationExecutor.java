@@ -1,7 +1,13 @@
 package com.company.datavalidation.service.validation;
 
-import com.company.datavalidation.model.*;
-import com.company.datavalidation.repository.*;
+import com.company.datavalidation.model.ComparisonConfig;
+import com.company.datavalidation.model.CrossTableConfig;
+import com.company.datavalidation.model.DayOverDayConfig;
+import com.company.datavalidation.model.ValidationResult;
+import com.company.datavalidation.repository.ComparisonConfigRepository;
+import com.company.datavalidation.repository.CrossTableConfigRepository;
+import com.company.datavalidation.repository.DayOverDayConfigRepository;
+import com.company.datavalidation.repository.ValidationResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -9,7 +15,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;

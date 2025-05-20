@@ -1,7 +1,13 @@
 package com.company.datavalidation.service.validation;
 
-import com.company.datavalidation.model.*;
-import com.company.datavalidation.repository.*;
+import com.company.datavalidation.model.ComparisonConfig;
+import com.company.datavalidation.model.CrossTableConfig;
+import com.company.datavalidation.model.DayOverDayConfig;
+import com.company.datavalidation.model.ValidationResult;
+import com.company.datavalidation.repository.ComparisonConfigRepository;
+import com.company.datavalidation.repository.CrossTableConfigRepository;
+import com.company.datavalidation.repository.DayOverDayConfigRepository;
+import com.company.datavalidation.repository.ValidationResultRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,7 +20,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)

@@ -1,6 +1,9 @@
 package com.company.datavalidation.service.comparison;
 
-import com.company.datavalidation.model.*;
+import com.company.datavalidation.model.ColumnComparisonConfig;
+import com.company.datavalidation.model.ComparisonResult;
+import com.company.datavalidation.model.ComparisonType;
+import com.company.datavalidation.model.HandlingStrategy;
 import com.company.datavalidation.repository.DynamicTableRepository;
 import lombok.RequiredArgsConstructor;
 

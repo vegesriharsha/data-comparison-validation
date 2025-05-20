@@ -1,6 +1,9 @@
 package com.company.datavalidation.service.reporting;
 
-import com.company.datavalidation.model.*;
+import com.company.datavalidation.model.EmailNotificationConfig;
+import com.company.datavalidation.model.Severity;
+import com.company.datavalidation.model.ValidationDetailResult;
+import com.company.datavalidation.model.ValidationResult;
 import com.company.datavalidation.repository.EmailNotificationConfigRepository;
 import com.company.datavalidation.repository.ValidationDetailResultRepository;
 import jakarta.mail.MessagingException;
@@ -13,10 +16,7 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;

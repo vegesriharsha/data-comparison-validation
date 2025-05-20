@@ -1,7 +1,10 @@
 package com.company.datavalidation.service.validation;
 
 import com.company.datavalidation.model.*;
-import com.company.datavalidation.repository.*;
+import com.company.datavalidation.repository.ColumnComparisonConfigRepository;
+import com.company.datavalidation.repository.ThresholdConfigRepository;
+import com.company.datavalidation.repository.ValidationDetailResultRepository;
+import com.company.datavalidation.repository.ValidationResultRepository;
 import com.company.datavalidation.service.comparison.CrossTableComparator;
 import com.company.datavalidation.service.comparison.DayOverDayComparator;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,7 +15,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;

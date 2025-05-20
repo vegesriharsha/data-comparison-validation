@@ -37,7 +37,8 @@ public class HibernateJacksonConfig {
      * @param objectMapper the ObjectMapper bean
      */
     @Bean
-    public void configureHibernateModule(ObjectMapper objectMapper) {
+    public ObjectMapper configureHibernateModule(ObjectMapper objectMapper) {
         objectMapper.registerModule(hibernateModule());
+        return objectMapper;
     }
 }

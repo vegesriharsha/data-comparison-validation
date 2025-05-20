@@ -2,8 +2,6 @@ package com.company.datavalidation.model;
 
 import jakarta.persistence.*;
 
-import javax.print.attribute.standard.Severity;
-
 @Entity
 @Table(name = "email_notification_config")
 public class EmailNotificationConfig {

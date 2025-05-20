@@ -78,6 +78,9 @@ public class ThresholdValidatorTest {
         column1.setDayOverDayConfig(dayOverDayConfig);
         column1.setColumnName("amount");
         column1.setComparisonType(ComparisonType.PERCENTAGE);
+        column1.setNullHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO);
+        column1.setBlankHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO);
+        column1.setNaHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO);
         columnConfigs.add(column1);
 
         ColumnComparisonConfig column2 = new ColumnComparisonConfig();
@@ -86,6 +89,9 @@ public class ThresholdValidatorTest {
         column2.setColumnName("count");
         column2.setTargetColumnName("total_count");
         column2.setComparisonType(ComparisonType.ABSOLUTE);
+        column2.setNullHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO);
+        column2.setBlankHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO);
+        column2.setNaHandlingStrategy(HandlingStrategy.TREAT_AS_ZERO);
         columnConfigs.add(column2);
 
         // Setup threshold configs
@@ -95,12 +101,16 @@ public class ThresholdValidatorTest {
         threshold1.setId(1L);
         threshold1.setColumnComparisonConfig(column1);
         threshold1.setThresholdValue(new BigDecimal("5.00"));
+        threshold1.setSeverity(Severity.HIGH);
+        threshold1.setNotificationEnabled(true);
         thresholdConfigs.add(threshold1);
 
         ThresholdConfig threshold2 = new ThresholdConfig();
         threshold2.setId(2L);
         threshold2.setColumnComparisonConfig(column2);
         threshold2.setThresholdValue(new BigDecimal("3.00"));
+        threshold2.setSeverity(Severity.MEDIUM);
+        threshold2.setNotificationEnabled(true);
         thresholdConfigs.add(threshold2);
     }
 

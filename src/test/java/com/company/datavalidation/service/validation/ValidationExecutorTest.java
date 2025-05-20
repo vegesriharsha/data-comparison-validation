@@ -33,6 +33,9 @@ public class ValidationExecutorTest {
     @Mock
     private ThresholdValidator thresholdValidator;
 
+    @Mock
+    private ValidationResultRepository validationResultRepository;
+
     @InjectMocks
     private ValidationExecutor validationExecutor;
 
@@ -174,5 +177,46 @@ public class ValidationExecutorTest {
         verify(dayOverDayConfigRepository).findByComparisonConfigId(config1.getId());
         verify(crossTableConfigRepository).findBySourceComparisonConfigAndEnabled(config1, true);
         verify(thresholdValidator).validateDayOverDay(dayOverDayConfig);
+    }
+
+    @Test
+    public void testRetryValidation() {
+        // Mock repository behavior
+        when(validationResultRepository.findById(1L)).thenReturn(Optional.of(failedResult));
+
+        when(dayOverDayConfigRepository.findByComparisonConfigId(failedResult.getComparisonConfig().getId()))
+                .thenReturn(Optional.empty());
+
+        when(crossTableConfigRepository.findBySourceComparisonConfigAndEnabled(
+                failedResult.getComparisonConfig(), true))
+                .thenReturn(Collections.singletonList(crossTableConfig));
+
+        when(thresholdValidator.validateCrossTable(crossTableConfig))
+                .thenReturn(successResult);
+
+        // Execute retry
+        ValidationResult result = validationExecutor.retryValidation(1L);
+
+        // Verify results
+        assertNotNull(result);
+        assertEquals(successResult, result);
+
+        // Verify repository calls
+        verify(validationResultRepository).findById(1L);
+    }
+
+    @Test
+    public void testRetryValidation_NotFound() {
+        // Mock repository behavior
+        when(validationResultRepository.findById(1L)).thenReturn(Optional.empty());
+
+        // Execute retry
+        ValidationResult result = validationExecutor.retryValidation(1L);
+
+        // Verify results
+        assertNull(result);
+
+        // Verify repository calls
+        verify(validationResultRepository).findById(1L);
     }
 }

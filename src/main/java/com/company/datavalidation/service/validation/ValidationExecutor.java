@@ -25,19 +25,17 @@ public class ValidationExecutor {
     private final DayOverDayConfigRepository dayOverDayConfigRepository;
     private final CrossTableConfigRepository crossTableConfigRepository;
     private final ThresholdValidator thresholdValidator;
+    private final ValidationResultRepository validationResultRepository;
 
     private final ExecutorService executorService = Executors.newFixedThreadPool(5);
 
     @Autowired
-    public ValidationExecutor(
-            ComparisonConfigRepository comparisonConfigRepository,
-            DayOverDayConfigRepository dayOverDayConfigRepository,
-            CrossTableConfigRepository crossTableConfigRepository,
-            ThresholdValidator thresholdValidator) {
+    public ValidationExecutor(ComparisonConfigRepository comparisonConfigRepository, DayOverDayConfigRepository dayOverDayConfigRepository, CrossTableConfigRepository crossTableConfigRepository, ThresholdValidator thresholdValidator, ValidationResultRepository validationResultRepository) {
         this.comparisonConfigRepository = comparisonConfigRepository;
         this.dayOverDayConfigRepository = dayOverDayConfigRepository;
         this.crossTableConfigRepository = crossTableConfigRepository;
         this.thresholdValidator = thresholdValidator;
+        this.validationResultRepository = validationResultRepository;
     }
 
     /**
@@ -175,7 +173,7 @@ public class ValidationExecutor {
         logger.info("Retrying validation for result ID: {}", validationResultId);
 
         // Get the failed validation result
-        Optional<ValidationResult> failedResultOpt = Optional.ofNullable(null); // Replace with actual repository call
+        Optional<ValidationResult> failedResultOpt = validationResultRepository.findById(validationResultId);
 
         if (failedResultOpt.isPresent()) {
             ValidationResult failedResult = failedResultOpt.get();
